@@ -23,6 +23,9 @@
     <Filter Include="Source Files\MiniFilter">
       <UniqueIdentifier>{515d2fb4-0a01-46cd-ab26-97648786c7f5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\NotifyRoutine">
+      <UniqueIdentifier>{81ee652e-6483-45eb-a2ce-3a06bd95d6ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.c">
@@ -34,6 +37,9 @@
     <ClCompile Include="Minifilter.c">
       <Filter>Source Files\MiniFilter</Filter>
     </ClCompile>
+    <ClCompile Include="NotifyRoutine.c">
+      <Filter>Source Files\NotifyRoutine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Callback.h">
@@ -41,6 +47,9 @@
     </ClInclude>
     <ClInclude Include="Minifilter.h">
       <Filter>Source Files\MiniFilter</Filter>
+    </ClInclude>
+    <ClInclude Include="NotifyRoutine.h">
+      <Filter>Source Files\NotifyRoutine</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

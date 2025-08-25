@@ -97,10 +97,12 @@
     <ClCompile Include="Callback.c" />
     <ClCompile Include="Main.c" />
     <ClCompile Include="Minifilter.c" />
+    <ClCompile Include="NotifyRoutine.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Callback.h" />
     <ClInclude Include="Minifilter.h" />
+    <ClInclude Include="NotifyRoutine.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

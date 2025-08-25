@@ -2,6 +2,7 @@
 #define DRIVER_TAG 'bdwh'
 #include "Callback.h"
 #include "Minifilter.h"
+#include "NotifyRoutine.h"
 
 
 UNICODE_STRING g_RegPath;
@@ -39,6 +40,10 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
         "createRegistrationMiniFilter() returned 0x%08X\n", st);
 
+	st = registerProcessNotifyRoutine();
+	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+		"registerProcessNotifyRoutine() returned 0x%08X\n", st);
+
 
     return STATUS_SUCCESS;
 }
@@ -49,6 +54,13 @@ void UnloadMe(PDRIVER_OBJECT DriverObject) {
         ObUnRegisterCallbacks(callbackRegistrationHandle);  // blocks until in-flight callbacks exit
         callbackRegistrationHandle = NULL;
     }
+
+	if (g_minifilterHandle) {
+		FltUnregisterFilter(g_minifilterHandle);
+		g_minifilterHandle = NULL;
+	}
+
+	unregisterProcessNotifyRoutine();
 
     if (g_RegPath.Buffer != NULL) {
         ExFreePool(g_RegPath.Buffer);

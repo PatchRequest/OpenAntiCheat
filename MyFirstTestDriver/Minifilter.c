@@ -113,3 +113,4 @@ NTSTATUS FLTAPI InstanceQueryTeardownCallback(
     UNREFERENCED_PARAMETER(Flags);
     return STATUS_SUCCESS;
 }
+
