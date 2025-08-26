@@ -3,6 +3,7 @@
 #include "Callback.h"
 #include "Minifilter.h"
 #include "NotifyRoutine.h"
+#include "Coms.h"
 
 
 UNICODE_STRING g_RegPath;
@@ -44,6 +45,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
 	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 		"registerProcessNotifyRoutine() returned 0x%08X\n", st);
 
+	st = BindToExistingFilterAndCreatePort(L"TestDriver");
+	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+		"createRegistrationComFilter() returned 0x%08X\n", st);
 
     return STATUS_SUCCESS;
 }
@@ -59,6 +63,11 @@ void UnloadMe(PDRIVER_OBJECT DriverObject) {
 		FltUnregisterFilter(g_minifilterHandle);
 		g_minifilterHandle = NULL;
 	}
+
+    MinifltPortFinalize();
+    if (flt_handle) {
+        FltUnregisterFilter(flt_handle);
+    }
 
 	unregisterProcessNotifyRoutine();
 

@@ -26,6 +26,9 @@
     <Filter Include="Source Files\NotifyRoutine">
       <UniqueIdentifier>{81ee652e-6483-45eb-a2ce-3a06bd95d6ec}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Coms">
+      <UniqueIdentifier>{5142cbca-9047-4871-b292-5a30575a6ed6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.c">
@@ -40,6 +43,9 @@
     <ClCompile Include="NotifyRoutine.c">
       <Filter>Source Files\NotifyRoutine</Filter>
     </ClCompile>
+    <ClCompile Include="Coms.c">
+      <Filter>Source Files\Coms</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Callback.h">
@@ -50,6 +56,9 @@
     </ClInclude>
     <ClInclude Include="NotifyRoutine.h">
       <Filter>Source Files\NotifyRoutine</Filter>
+    </ClInclude>
+    <ClInclude Include="Coms.h">
+      <Filter>Source Files\Coms</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

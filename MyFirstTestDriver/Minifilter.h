@@ -1,8 +1,7 @@
 #pragma once
 #include <fltKernel.h>   
 
-
-PFLT_FILTER g_minifilterHandle;
+extern PFLT_FILTER g_minifilterHandle;
 
 NTSTATUS createRegistrationMiniFilter(PDRIVER_OBJECT DriverObject);
 NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags);

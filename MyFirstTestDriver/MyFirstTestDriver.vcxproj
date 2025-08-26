@@ -84,6 +84,9 @@
       <AdditionalOptions> /INTEGRITYCHECK %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>$(DDK_LIB_PATH)\fltMgr.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ClCompile>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DriverSign>
@@ -95,12 +98,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Callback.c" />
+    <ClCompile Include="Coms.c" />
     <ClCompile Include="Main.c" />
     <ClCompile Include="Minifilter.c" />
     <ClCompile Include="NotifyRoutine.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Callback.h" />
+    <ClInclude Include="Coms.h" />
     <ClInclude Include="Minifilter.h" />
     <ClInclude Include="NotifyRoutine.h" />
   </ItemGroup>
