@@ -82,16 +82,6 @@ NTSTATUS createRegistrationMiniFilter(PDRIVER_OBJECT DriverObject) {
     return status;
 }
 
-NTSTATUS FLTAPI FilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
-{
-    UNREFERENCED_PARAMETER(Flags);
-    if (g_minifilterHandle) {
-        FltUnregisterFilter(g_minifilterHandle);
-        g_minifilterHandle = NULL;
-    }
-    return STATUS_SUCCESS;
-}
-
 NTSTATUS FLTAPI InstanceSetupCallback(
     _In_ PCFLT_RELATED_OBJECTS  FltObjects,
     _In_ FLT_INSTANCE_SETUP_FLAGS  Flags,

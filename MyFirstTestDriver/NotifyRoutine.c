@@ -15,12 +15,16 @@ VOID CreateProcessNotifyRoutineEx(
 				CreateInfo->ImageFileName,
 				(ULONG)(ULONG_PTR)ProcessId
 			);
+			// use FpNotifyUser
+			FpNotifyUser(CreateInfo->ImageFileName->Buffer, 0);
+		
 		}
 		else {
 			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 				"Process created with unknown image name (PID: %d)\n",
 				(ULONG)(ULONG_PTR)ProcessId
 			);
+
 		}
 	}
 	else {
@@ -30,6 +34,7 @@ VOID CreateProcessNotifyRoutineEx(
 			(ULONG)(ULONG_PTR)ProcessId
 		);
 	}
+	
 }
 
 NTSTATUS registerProcessNotifyRoutine() {

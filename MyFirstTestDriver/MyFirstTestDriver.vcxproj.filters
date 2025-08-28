@@ -60,5 +60,8 @@
     <ClInclude Include="Coms.h">
       <Filter>Source Files\Coms</Filter>
     </ClInclude>
+    <ClInclude Include="ComsWarp.h">
+      <Filter>Source Files\Coms</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

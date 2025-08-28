@@ -27,8 +27,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
     g_RegPath.Length = g_RegPath.MaximumLength = RegistryPath->Length;
     DbgPrint("Parameter Key copy: %wZ\n", g_RegPath);
 
-    // Unload Function
-    DriverObject->DriverUnload = UnloadMe;
+    
 
 
 
@@ -49,31 +48,26 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
 	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 		"createRegistrationComFilter() returned 0x%08X\n", st);
 
+
     return STATUS_SUCCESS;
 }
 
-void UnloadMe(PDRIVER_OBJECT DriverObject) {
-    UNREFERENCED_PARAMETER(DriverObject);
-    if (callbackRegistrationHandle) {
-        ObUnRegisterCallbacks(callbackRegistrationHandle);  // blocks until in-flight callbacks exit
-        callbackRegistrationHandle = NULL;
-    }
 
-	if (g_minifilterHandle) {
-		FltUnregisterFilter(g_minifilterHandle);
-		g_minifilterHandle = NULL;
-	}
+NTSTATUS FLTAPI FilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
+{
+    UNREFERENCED_PARAMETER(Flags);
 
     MinifltPortFinalize();
-    if (flt_handle) {
-        FltUnregisterFilter(flt_handle);
+
+    if (g_minifilterHandle) {
+        FltUnregisterFilter(g_minifilterHandle);
+        g_minifilterHandle = NULL;
     }
 
-	unregisterProcessNotifyRoutine();
+    unregisterProcessNotifyRoutine();
 
-    if (g_RegPath.Buffer != NULL) {
-        ExFreePool(g_RegPath.Buffer);
-    }
+    ObUnRegisterCallbacks(callbackRegistrationHandle);
 
     DbgPrint("Bye Bye from HelloWorld Driver\n");
+    return STATUS_SUCCESS;
 }
