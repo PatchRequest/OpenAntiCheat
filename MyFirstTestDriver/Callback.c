@@ -14,6 +14,11 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
     if (OperationInformation->Operation == OB_OPERATION_HANDLE_DUPLICATE) {
         return OB_PREOP_SUCCESS;
     }
+
+    (void)FpSendRaw(&(OB_OPERATION_HANDLE_Event) { OperationInformation, pid },
+        sizeof(OB_OPERATION_HANDLE_Event), NULL, 0, NULL);
+
+
     if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
         POB_PRE_CREATE_HANDLE_INFORMATION preInfo = &OperationInformation->Parameters->CreateHandleInformation;
         if (!(preInfo->DesiredAccess & PROCESS_VM_WRITE)) {

@@ -106,6 +106,7 @@
   <ItemGroup>
     <ClInclude Include="Callback.h" />
     <ClInclude Include="Coms.h" />
+    <ClInclude Include="ComsEvents.h" />
     <ClInclude Include="ComsWarp.h" />
     <ClInclude Include="Minifilter.h" />
     <ClInclude Include="NotifyRoutine.h" />

@@ -1,6 +1,7 @@
 #pragma once
 #include <ntifs.h>
 #include "ComsWarp.h"
+#include "ComsEvents.h"
 
 
 VOID CreateProcessNotifyRoutineEx(

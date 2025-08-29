@@ -7,7 +7,16 @@ VOID CreateProcessNotifyRoutineEx(
 ) {
 	UNREFERENCED_PARAMETER(Process);
 	UNREFERENCED_PARAMETER(ProcessId);
+
+
+	// use CreateProcessNotifyRoutineEvent and FpSendRaw to send process creation/termination info to user-mode app
+	(void)FpSendRaw(&(CreateProcessNotifyRoutineEvent) { Process, ProcessId, CreateInfo },
+		sizeof(CreateProcessNotifyRoutineEvent), NULL, 0, NULL);
+
+
+
 	if (CreateInfo) {
+
 		// Process is being created
 		if (CreateInfo->ImageFileName) {
 			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
@@ -15,16 +24,12 @@ VOID CreateProcessNotifyRoutineEx(
 				CreateInfo->ImageFileName,
 				(ULONG)(ULONG_PTR)ProcessId
 			);
-			// use FpNotifyUser
-			FpNotifyUser(CreateInfo->ImageFileName->Buffer, 0);
-		
 		}
 		else {
 			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 				"Process created with unknown image name (PID: %d)\n",
 				(ULONG)(ULONG_PTR)ProcessId
 			);
-
 		}
 	}
 	else {

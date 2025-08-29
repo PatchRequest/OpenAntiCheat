@@ -1,6 +1,7 @@
 #pragma once
 #include <fltKernel.h>   
 #include "Coms.h"
+#include "ComsEvents.h"
 
 extern PFLT_FILTER g_minifilterHandle;
 
