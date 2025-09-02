@@ -18,6 +18,7 @@ class PROCESS_EVENT(ctypes.Structure):
         ("isCreate", ctypes.c_int),
         ("ProcessId", ctypes.c_int),
         ("ImageFileName", wt.WCHAR * 260),
+        ("CommandLine", wt.WCHAR * 1024)
     ]
 
 FMT_FROM_SYSTEM = 0x00001000
@@ -72,7 +73,7 @@ class Receiver:
 
             kind  = "CREATE" if evt.isCreate else "EXIT"
             image = evt.ImageFileName if evt.isCreate and evt.ImageFileName else "Unknown"
-            print(f"[PROC] {kind} pid={evt.ProcessId} image={image} msgId={hdr.MessageId} replyLen={hdr.ReplyLength}")
+            print(f"[PROC] {kind} pid={evt.ProcessId} image={image} msgId={hdr.MessageId} replyLen={hdr.ReplyLength} CommandLine={evt.CommandLine}")
 
     def close(self):
         if self.hPort:

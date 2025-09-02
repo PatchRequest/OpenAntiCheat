@@ -9,43 +9,29 @@ VOID CreateProcessNotifyRoutineEx(
 	UNREFERENCED_PARAMETER(ProcessId);
 		
 	CreateProcessNotifyRoutineEvent event = { 0 };
+	TAG_INIT(event, PROC_TAG);
 	event.isCreate = (CreateInfo != NULL) ? 1 : 0;
 	event.ProcessId = (int)(ULONG_PTR)ProcessId;
 	
 
 
+	
 	if (CreateInfo) {
-
-
-
 		// Process is being created
 		if (CreateInfo->ImageFileName) {
-			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-				"Process created: %wZ (PID: %d)\n",
-				CreateInfo->ImageFileName,
-				(ULONG)(ULONG_PTR)ProcessId
-			);
+			event.CommandLine[0] = L'\0';
 			event.ImageFileName[0] = L'\0';
 			wcsncpy_s(event.ImageFileName, 260, CreateInfo->ImageFileName->Buffer, _TRUNCATE);
-			
+			wcsncpy_s(event.CommandLine, 1024, CreateInfo->CommandLine->Buffer, _TRUNCATE);
 		}
 		else {
-			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-				"Process created with unknown image name (PID: %d)\n",
-				(ULONG)(ULONG_PTR)ProcessId
-			);
 			wcscpy_s(event.ImageFileName, 260, L"Unknown");
-			
+			wcscpy_s(event.CommandLine, 1024, L"Unknown");
 		}
 	}
 	else {
-		// Process is being terminated
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"Process terminated (PID: %d)\n",
-			(ULONG)(ULONG_PTR)ProcessId
-		);
+		wcscpy_s(event.ImageFileName, 260, L"Terminated");
 	}
-
 	// Send the event to user-mode via the communication port with FpSendRaw
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
@@ -53,8 +39,6 @@ VOID CreateProcessNotifyRoutineEx(
 		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 			"FpSendRaw failed with status 0x%08X\n", status);
 	}
-	
-
 }
 
 VOID CreateThreadNotifyRoutine(

@@ -52,15 +52,25 @@ PreOperationCreate(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
 
-    if (Data && Data->Iopb && Data->Iopb->TargetFileObject) {
-        UNICODE_STRING targetPath;
-        RtlInitUnicodeString(&targetPath, L"\\Users\\user\\Desktop\\SuperGeheim");
+	if (Data->RequestorMode == KernelMode) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
 
-        if (RtlEqualUnicodeString(&Data->Iopb->TargetFileObject->FileName, &targetPath, TRUE)) {
-            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-                "Matched: %wZ\n", &Data->Iopb->TargetFileObject->FileName);
-        }
-    }
+	FLT_PREOP_CALLBACK_Event event = { 0 };
+    TAG_INIT(event, FLT_TAG);
+	event.operation = Data->Iopb->MajorFunction;
+	event.ProcessId = (int)(ULONG_PTR)PsGetThreadProcessId(Data->Thread);
+	if (Data->Iopb->TargetFileObject) {
+		event.FileName[0] = L'\0';
+		wcsncpy_s(event.FileName, 260, Data->Iopb->TargetFileObject->FileName.Buffer, _TRUNCATE);
+	}
+    // send to usermode
+	ULONG sentBytes = 0;
+	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
+	if (!NT_SUCCESS(status)) {
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+			"FpSendRaw failed with status 0x%08X\n", status);
+	}
     return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
