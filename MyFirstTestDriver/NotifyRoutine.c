@@ -7,9 +7,14 @@ VOID CreateProcessNotifyRoutineEx(
 ) {
 	UNREFERENCED_PARAMETER(Process);
 	UNREFERENCED_PARAMETER(ProcessId);
-
+		
+	JSON_BUILDER jsonBuilder;
+	JsonBuilder_Init(&jsonBuilder);
 
 	if (CreateInfo) {
+
+		JsonBuilder_AddString(&jsonBuilder, L"Event", L"ProcessCreated");
+		JsonBuilder_AddNumber(&jsonBuilder, L"PID", (ULONG)(ULONG_PTR)ProcessId);
 
 		// Process is being created
 		if (CreateInfo->ImageFileName) {
@@ -18,12 +23,14 @@ VOID CreateProcessNotifyRoutineEx(
 				CreateInfo->ImageFileName,
 				(ULONG)(ULONG_PTR)ProcessId
 			);
+			JsonBuilder_AddString(&jsonBuilder, L"ImageFileName", CreateInfo->ImageFileName->Buffer);
 		}
 		else {
 			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 				"Process created with unknown image name (PID: %d)\n",
 				(ULONG)(ULONG_PTR)ProcessId
 			);
+			JsonBuilder_AddString(&jsonBuilder, L"ImageFileName", L"Unknown");
 		}
 	}
 	else {
@@ -33,7 +40,11 @@ VOID CreateProcessNotifyRoutineEx(
 			(ULONG)(ULONG_PTR)ProcessId
 		);
 	}
-	
+	const WCHAR* jsonOutput = NULL;
+	if (NT_SUCCESS(JsonBuilder_Build(&jsonBuilder, &jsonOutput))) {
+		FpNotifyUser(jsonOutput, 0); // fire-and-forget notification to user-mode
+	}
+
 }
 
 VOID CreateThreadNotifyRoutine(

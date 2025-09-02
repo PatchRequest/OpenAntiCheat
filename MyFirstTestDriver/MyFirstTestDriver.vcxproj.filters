@@ -29,6 +29,9 @@
     <Filter Include="Source Files\Coms">
       <UniqueIdentifier>{5142cbca-9047-4871-b292-5a30575a6ed6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\JsonBuilder">
+      <UniqueIdentifier>{8396345b-1e2e-4ccb-8033-5c63cb2bcbcd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.c">
@@ -45,6 +48,9 @@
     </ClCompile>
     <ClCompile Include="Coms.c">
       <Filter>Source Files\Coms</Filter>
+    </ClCompile>
+    <ClCompile Include="JsonBuilder.c">
+      <Filter>Source Files\JsonBuilder</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -65,6 +71,9 @@
     </ClInclude>
     <ClInclude Include="ComsEvents.h">
       <Filter>Source Files\Coms</Filter>
+    </ClInclude>
+    <ClInclude Include="JsonBuilder.h">
+      <Filter>Source Files\JsonBuilder</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

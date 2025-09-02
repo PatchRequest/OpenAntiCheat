@@ -2,6 +2,7 @@
 #include <ntifs.h>
 #include "ComsWarp.h"
 #include "ComsEvents.h"
+#include "JsonBuilder.h"
 
 
 VOID CreateProcessNotifyRoutineEx(
