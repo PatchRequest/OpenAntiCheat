@@ -8,13 +8,15 @@ VOID CreateProcessNotifyRoutineEx(
 	UNREFERENCED_PARAMETER(Process);
 	UNREFERENCED_PARAMETER(ProcessId);
 		
-	JSON_BUILDER jsonBuilder;
-	JsonBuilder_Init(&jsonBuilder);
+	CreateProcessNotifyRoutineEvent event = { 0 };
+	event.isCreate = (CreateInfo != NULL) ? 1 : 0;
+	event.ProcessId = (int)(ULONG_PTR)ProcessId;
+	
+
 
 	if (CreateInfo) {
 
-		JsonBuilder_AddString(&jsonBuilder, L"Event", L"ProcessCreated");
-		JsonBuilder_AddNumber(&jsonBuilder, L"PID", (ULONG)(ULONG_PTR)ProcessId);
+
 
 		// Process is being created
 		if (CreateInfo->ImageFileName) {
@@ -23,14 +25,17 @@ VOID CreateProcessNotifyRoutineEx(
 				CreateInfo->ImageFileName,
 				(ULONG)(ULONG_PTR)ProcessId
 			);
-			JsonBuilder_AddString(&jsonBuilder, L"ImageFileName", CreateInfo->ImageFileName->Buffer);
+			event.ImageFileName[0] = L'\0';
+			wcsncpy_s(event.ImageFileName, 260, CreateInfo->ImageFileName->Buffer, _TRUNCATE);
+			
 		}
 		else {
 			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 				"Process created with unknown image name (PID: %d)\n",
 				(ULONG)(ULONG_PTR)ProcessId
 			);
-			JsonBuilder_AddString(&jsonBuilder, L"ImageFileName", L"Unknown");
+			wcscpy_s(event.ImageFileName, 260, L"Unknown");
+			
 		}
 	}
 	else {
@@ -40,10 +45,15 @@ VOID CreateProcessNotifyRoutineEx(
 			(ULONG)(ULONG_PTR)ProcessId
 		);
 	}
-	const WCHAR* jsonOutput = NULL;
-	if (NT_SUCCESS(JsonBuilder_Build(&jsonBuilder, &jsonOutput))) {
-		FpNotifyUser(jsonOutput, 0); // fire-and-forget notification to user-mode
+
+	// Send the event to user-mode via the communication port with FpSendRaw
+	ULONG sentBytes = 0;
+	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
+	if (!NT_SUCCESS(status)) {
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+			"FpSendRaw failed with status 0x%08X\n", status);
 	}
+	
 
 }
 

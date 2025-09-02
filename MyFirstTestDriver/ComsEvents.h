@@ -3,16 +3,17 @@
 #include "ComsWarp.h"
 
 typedef struct _CreateProcessNotifyRoutineEvent {
-	PEPROCESS Process;
-	HANDLE ProcessId;
-	PPS_CREATE_NOTIFY_INFO CreateInfo;
+
+	int isCreate; // 1 = create, 0 = exit
+	int ProcessId;
+	wchar_t ImageFileName[260];
 
 } CreateProcessNotifyRoutineEvent, * PCreateProcessNotifyRoutineEvent;
 
 
 typedef struct _OB_OPERATION_HANDLE_Event {
-	POB_PRE_OPERATION_INFORMATION OperationInformation;
-	HANDLE pid;
+	int operation; // OB_OPERATION_HANDLE_CREATE = 0, OB_OPERATION_HANDLE_DUPLICATE = 1
+	int ProcessId;
 } OB_OPERATION_HANDLE_Event, * POB_OPERATION_HANDLE_Event;
 
 

@@ -99,7 +99,6 @@
   <ItemGroup>
     <ClCompile Include="Callback.c" />
     <ClCompile Include="Coms.c" />
-    <ClCompile Include="JsonBuilder.c" />
     <ClCompile Include="Main.c" />
     <ClCompile Include="Minifilter.c" />
     <ClCompile Include="NotifyRoutine.c" />
@@ -109,7 +108,6 @@
     <ClInclude Include="Coms.h" />
     <ClInclude Include="ComsEvents.h" />
     <ClInclude Include="ComsWarp.h" />
-    <ClInclude Include="JsonBuilder.h" />
     <ClInclude Include="Minifilter.h" />
     <ClInclude Include="NotifyRoutine.h" />
   </ItemGroup>
