@@ -11,23 +11,18 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
         return OB_PREOP_SUCCESS;
     }
     HANDLE pid = PsGetProcessId(Process);
-    if (OperationInformation->Operation == OB_OPERATION_HANDLE_DUPLICATE) {
-        return OB_PREOP_SUCCESS;
-    }
 
-    if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
-        POB_PRE_CREATE_HANDLE_INFORMATION preInfo = &OperationInformation->Parameters->CreateHandleInformation;
-        if (!(preInfo->DesiredAccess & PROCESS_VM_WRITE)) {
-            return OB_PREOP_SUCCESS;
-        }
-    }
+	OB_OPERATION_HANDLE_Event event = { 0 };
+	TAG_INIT(event, OB_TAG);
+	event.operation = OperationInformation->Operation;
+	event.ProcessId = (int)(ULONG_PTR)pid;
+	ULONG sentBytes = 0;
+	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
+	if (!NT_SUCCESS(status)) {
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+			"FpSendRaw failed with status 0x%08X\n", status);
+	}
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-        "CreateCallback called with operation %d on process at address %p with PID %d\n",
-        OperationInformation->Operation,
-        Process,
-        pid
-    );
 
     return OB_PREOP_SUCCESS;
 }

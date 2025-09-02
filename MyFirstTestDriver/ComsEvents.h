@@ -4,6 +4,7 @@
 
 #define PROC_TAG 0
 #define FLT_TAG  1
+#define OB_TAG   2
 #define TAG_INIT(ev, tag) do { \
     RtlZeroMemory(&(ev), sizeof(ev)); \
     (ev).reserved = (tag); \
@@ -29,6 +30,7 @@ typedef struct _FLT_PREOP_CALLBACK_Event {
 
 
 typedef struct _OB_OPERATION_HANDLE_Event {
+	int reserved; // always 2
 	int operation; // OB_OPERATION_HANDLE_CREATE = 0, OB_OPERATION_HANDLE_DUPLICATE = 1
 	int ProcessId;
 } OB_OPERATION_HANDLE_Event, * POB_OPERATION_HANDLE_Event;
