@@ -40,9 +40,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
         "createRegistrationMiniFilter() returned 0x%08X\n", st);
 
-	st = registerProcessNotifyRoutine();
+	st = registerNotifyRoutine();
 	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-		"registerProcessNotifyRoutine() returned 0x%08X\n", st);
+		"registerNotifyRoutine() returned 0x%08X\n", st);
 
 	st = BindToExistingFilterAndCreatePort(L"TestDriver");
 	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
@@ -64,7 +64,7 @@ NTSTATUS FLTAPI FilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
         g_minifilterHandle = NULL;
     }
 
-    unregisterProcessNotifyRoutine();
+    unregisterNotifyRoutine();
 
     ObUnRegisterCallbacks(callbackRegistrationHandle);
 

@@ -10,6 +10,6 @@ VOID CreateProcessNotifyRoutineEx(
 	_In_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo
 );
 
-NTSTATUS registerProcessNotifyRoutine();
-void unregisterProcessNotifyRoutine();
+NTSTATUS registerNotifyRoutine();
+void unregisterNotifyRoutine();
 

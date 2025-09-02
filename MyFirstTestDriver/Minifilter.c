@@ -52,12 +52,6 @@ PreOperationCreate(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
 
-
-    (void)FpSendRaw(&(FLT_PREOP_CALLBACK_Event) { Data },
-        sizeof(FLT_PREOP_CALLBACK_Event), NULL, 0, NULL);
-
-
-
     if (Data && Data->Iopb && Data->Iopb->TargetFileObject) {
         UNICODE_STRING targetPath;
         RtlInitUnicodeString(&targetPath, L"\\Users\\user\\Desktop\\SuperGeheim");
