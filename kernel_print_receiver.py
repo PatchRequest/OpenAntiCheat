@@ -40,6 +40,14 @@ class OB_OPERATION_HANDLE_Event(ctypes.Structure):
         ("ProcessId", ctypes.c_int),
     ]
 
+class CreateThreadNotifyRoutineEvent(ctypes.Structure):
+    _fields_ = [
+        ("reserved", ctypes.c_int), # 3
+        ("isCreate", ctypes.c_int), # 1 create 2 exit
+        ("ProcessId", ctypes.c_int), 
+        ("ThreadId", ctypes.c_int), 
+    ]
+
 IRP_MAJOR = {
     0x00:"CREATE",0x01:"CREATE_NAMED_PIPE",0x02:"CLOSE",0x03:"READ",0x04:"WRITE",
     0x05:"QUERY_INFORMATION",0x06:"SET_INFORMATION",0x07:"QUERY_EA",0x08:"SET_EA",
@@ -88,9 +96,10 @@ class Receiver:
     def loop(self):
         hdr_sz = ctypes.sizeof(FILTER_MESSAGE_HEADER)
         sz_proc = ctypes.sizeof(CreateProcessNotifyRoutineEvent)
+        sz_thread = ctypes.sizeof(CreateThreadNotifyRoutineEvent)
         sz_flt  = ctypes.sizeof(FLT_PREOP_CALLBACK_Event)
         sz_ob   = ctypes.sizeof(OB_OPERATION_HANDLE_Event)
-        max_sz  = max(sz_proc, sz_flt, sz_ob)
+        max_sz  = max(sz_proc, sz_flt, sz_ob, sz_thread)
         buf     = ctypes.create_string_buffer(hdr_sz + max_sz)
 
         while True:
@@ -120,6 +129,9 @@ class Receiver:
                 op = OB_OP.get(ev.operation, f"OP_{ev.operation}")
                 print(f"[OB] {op} pid={ev.ProcessId} msgId={hdr.MessageId}")
 
+            elif tag == 3:
+                ev = CreateThreadNotifyRoutineEvent.from_buffer_copy(payload)
+                print(ev)
             else:
                 print(f"[WARN] unknown tag={tag} msgId={hdr.MessageId}")
 

@@ -49,24 +49,19 @@ VOID CreateThreadNotifyRoutine(
 	UNREFERENCED_PARAMETER(ProcessId);
 	UNREFERENCED_PARAMETER(ThreadId);
 	UNREFERENCED_PARAMETER(Create);
-	// You can implement thread creation/termination handling here if needed
 
-	// print  the thread creation/termination event
-	if (Create) {
+	CreateThreadNotifyRoutineEvent event = { 0 };
+	TAG_INIT(event, THREAD_TAG);
+	event.isCreate = Create ? 1 : 0;
+	event.ProcessId = (int)(ULONG_PTR)ProcessId;
+	event.ThreadId = (int)(ULONG_PTR)ThreadId;
+	// Send the event to user-mode via the communication port with FpSendRaw
+	ULONG sentBytes = 0;
+	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
+	if (!NT_SUCCESS(status)) {
 		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"Thread created (TID: %d) in process (PID: %d)\n",
-			(ULONG)(ULONG_PTR)ThreadId,
-			(ULONG)(ULONG_PTR)ProcessId
-		);
+			"FpSendRaw failed with status 0x%08X\n", status);
 	}
-	else {
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"Thread terminated (TID: %d) in process (PID: %d)\n",
-			(ULONG)(ULONG_PTR)ThreadId,
-			(ULONG)(ULONG_PTR)ProcessId
-		);
-	}
-
 }
 
 
@@ -78,7 +73,7 @@ NTSTATUS registerNotifyRoutine() {
 	}
 	status = PsSetCreateThreadNotifyRoutine(CreateThreadNotifyRoutine);
 	if (!NT_SUCCESS(status)) {
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+ 		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 			"PsSetCreateThreadNotifyRoutine failed with status 0x%08X\n", status);
 	}
 
