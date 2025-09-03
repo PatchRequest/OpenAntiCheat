@@ -6,6 +6,7 @@
 #define FLT_TAG  1
 #define OB_TAG   2
 #define THREAD_TAG 3
+#define LOADIMG_TAG 4
 #define TAG_INIT(ev, tag) do { \
     RtlZeroMemory(&(ev), sizeof(ev)); \
     (ev).reserved = (tag); \
@@ -41,3 +42,12 @@ typedef struct _CreateThreadNotifyRoutineEvent {
 	int ProcessId;
 	int ThreadId;
 } CreateThreadNotifyRoutineEvent, * PCreateThreadNotifyRoutineEvent;
+
+
+typedef struct _LoadImageNotifyRoutineEvent {
+	int reserved; // always 4
+	int ProcessId;
+	wchar_t ImageFileName[260];
+	PVOID ImageBase;
+	ULONG ImageSize;
+} LoadImageNotifyRoutineEvent, * PLoadImageNotifyRoutineEvent;

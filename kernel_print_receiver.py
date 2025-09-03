@@ -8,44 +8,60 @@ HRESULT = ctypes.c_long
 if not hasattr(wt, "ULONG_PTR"):
     wt.ULONG_PTR = ctypes.c_size_t
 
+# Tags
+PROC_TAG    = 0
+FLT_TAG     = 1
+OB_TAG      = 2
+THREAD_TAG  = 3
+LOADIMG_TAG = 4
+
 # FILTER_MESSAGE_HEADER (FltUser.h)
 class FILTER_MESSAGE_HEADER(ctypes.Structure):
-    _fields_ = [("ReplyLength", wt.DWORD), ("MessageId", ctypes.c_ulonglong)]
+    _fields_ = [
+        ("ReplyLength", wt.DWORD),
+        ("MessageId", ctypes.c_ulonglong),
+    ]
 
-# ----- kernel payloads with reserved as discriminator -----
-# reserved == 0
+# ------- kernel payloads (discriminator: reserved) -------
 class CreateProcessNotifyRoutineEvent(ctypes.Structure):
     _fields_ = [
-        ("reserved", ctypes.c_int),      # 0
-        ("isCreate", ctypes.c_int),      # 1 create 0 exit
+        ("reserved", ctypes.c_int),          # 0
+        ("isCreate", ctypes.c_int),          # 1 create, 0 exit
         ("ProcessId", ctypes.c_int),
         ("ImageFileName", wt.WCHAR * 260),
         ("CommandLine",  wt.WCHAR * 1024),
     ]
 
-# reserved == 1
 class FLT_PREOP_CALLBACK_Event(ctypes.Structure):
     _fields_ = [
-        ("reserved", ctypes.c_int),      # 1
-        ("operation", ctypes.c_int),     # IRP_MJ_*
+        ("reserved", ctypes.c_int),          # 1
+        ("operation", ctypes.c_int),         # IRP_MJ_*
         ("ProcessId", ctypes.c_int),
         ("FileName",  wt.WCHAR * 260),
     ]
 
-# reserved == 2
 class OB_OPERATION_HANDLE_Event(ctypes.Structure):
     _fields_ = [
-        ("reserved", ctypes.c_int),      # 2
-        ("operation", ctypes.c_int),     # 0 create 1 duplicate
+        ("reserved", ctypes.c_int),          # 2
+        ("operation", ctypes.c_int),         # 0 create, 1 duplicate
         ("ProcessId", ctypes.c_int),
     ]
 
 class CreateThreadNotifyRoutineEvent(ctypes.Structure):
     _fields_ = [
-        ("reserved", ctypes.c_int), # 3
-        ("isCreate", ctypes.c_int), # 1 create 2 exit
-        ("ProcessId", ctypes.c_int), 
-        ("ThreadId", ctypes.c_int), 
+        ("reserved", ctypes.c_int),          # 3
+        ("isCreate", ctypes.c_int),          # 1 create, 0 exit  (fixed)
+        ("ProcessId", ctypes.c_int),
+        ("ThreadId", ctypes.c_int),
+    ]
+
+class LoadImageNotifyRoutineEvent(ctypes.Structure):
+    _fields_ = [
+        ("reserved", ctypes.c_int),          # 4
+        ("ProcessId", ctypes.c_int),
+        ("ImageFileName", wt.WCHAR * 260),
+        ("ImageBase", ctypes.c_void_p),      # PVOID
+        ("ImageSize", wt.ULONG),
     ]
 
 IRP_MAJOR = {
@@ -76,12 +92,15 @@ class Receiver:
         self.fltlib = ctypes.windll.fltlib
         self.k32 = ctypes.windll.kernel32
         self.hPort = wt.HANDLE()
+
         self.fltlib.FilterConnectCommunicationPort.argtypes = [
             wt.LPCWSTR, wt.DWORD, wt.LPCVOID, wt.WORD, ctypes.c_void_p, ctypes.POINTER(wt.HANDLE)
         ]
         self.fltlib.FilterConnectCommunicationPort.restype = HRESULT
+
         self.fltlib.FilterGetMessage.argtypes = [wt.HANDLE, wt.LPVOID, wt.DWORD, ctypes.c_void_p]
         self.fltlib.FilterGetMessage.restype = HRESULT
+
         self.k32.CloseHandle.argtypes = [wt.HANDLE]
         self.k32.CloseHandle.restype = wt.BOOL
 
@@ -94,13 +113,15 @@ class Receiver:
         return True
 
     def loop(self):
-        hdr_sz = ctypes.sizeof(FILTER_MESSAGE_HEADER)
-        sz_proc = ctypes.sizeof(CreateProcessNotifyRoutineEvent)
-        sz_thread = ctypes.sizeof(CreateThreadNotifyRoutineEvent)
-        sz_flt  = ctypes.sizeof(FLT_PREOP_CALLBACK_Event)
-        sz_ob   = ctypes.sizeof(OB_OPERATION_HANDLE_Event)
-        max_sz  = max(sz_proc, sz_flt, sz_ob, sz_thread)
-        buf     = ctypes.create_string_buffer(hdr_sz + max_sz)
+        hdr_sz   = ctypes.sizeof(FILTER_MESSAGE_HEADER)
+        sz_proc  = ctypes.sizeof(CreateProcessNotifyRoutineEvent)
+        sz_thread= ctypes.sizeof(CreateThreadNotifyRoutineEvent)
+        sz_flt   = ctypes.sizeof(FLT_PREOP_CALLBACK_Event)
+        sz_ob    = ctypes.sizeof(OB_OPERATION_HANDLE_Event)
+        sz_img   = ctypes.sizeof(LoadImageNotifyRoutineEvent)
+        max_sz   = max(sz_proc, sz_flt, sz_ob, sz_thread, sz_img)
+
+        buf = ctypes.create_string_buffer(hdr_sz + max_sz)
 
         while True:
             hr = self.fltlib.FilterGetMessage(self.hPort, buf, len(buf), None)  # blocking
@@ -112,26 +133,37 @@ class Receiver:
             payload = buf.raw[hdr_sz:hdr_sz+max_sz]
             tag = ctypes.c_int.from_buffer_copy(payload, 0).value
 
-            if tag == 0:
+            if tag == PROC_TAG:
                 ev = CreateProcessNotifyRoutineEvent.from_buffer_copy(payload)
                 kind = "CREATE" if ev.isCreate else "EXIT"
                 img  = ev.ImageFileName if (ev.ImageFileName and ev.ImageFileName[0]) else "Unknown"
-                print(f"[PROC] {kind} pid={ev.ProcessId} image={img} msgId={hdr.MessageId} CommandLine={ev.CommandLine}")
+                cmd  = ev.CommandLine if (ev.CommandLine and ev.CommandLine[0]) else ""
+                print(f"[PROC] {kind} pid={ev.ProcessId} image={img} cmd={cmd} msgId={hdr.MessageId}")
 
-            elif tag == 1:
+            elif tag == FLT_TAG:
                 ev = FLT_PREOP_CALLBACK_Event.from_buffer_copy(payload)
                 op = IRP_MAJOR.get(ev.operation, f"0x{ev.operation:02X}")
                 fn = ev.FileName if (ev.FileName and ev.FileName[0]) else ""
                 print(f"[FILE] {op} pid={ev.ProcessId} file={fn} msgId={hdr.MessageId}")
 
-            elif tag == 2:
+            elif tag == OB_TAG:
                 ev = OB_OPERATION_HANDLE_Event.from_buffer_copy(payload)
                 op = OB_OP.get(ev.operation, f"OP_{ev.operation}")
                 print(f"[OB] {op} pid={ev.ProcessId} msgId={hdr.MessageId}")
 
-            elif tag == 3:
+            elif tag == THREAD_TAG:
                 ev = CreateThreadNotifyRoutineEvent.from_buffer_copy(payload)
-                print(ev)
+                kind = "CREATE" if ev.isCreate else "EXIT"
+                print(f"[THREAD] {kind} pid={ev.ProcessId} tid={ev.ThreadId} msgId={hdr.MessageId}")
+
+            elif tag == LOADIMG_TAG:
+                ev = LoadImageNotifyRoutineEvent.from_buffer_copy(payload)
+                img = ev.ImageFileName if (ev.ImageFileName and ev.ImageFileName[0]) else ""
+                base = f"0x{ctypes.addressof(ctypes.c_char.from_address(ev.ImageBase)) & 0xFFFFFFFFFFFFFFFF:016X}" if ev.ImageBase else "0x0"
+                # simpler: base = f"0x{ev.ImageBase:016X}" also works on CPython
+                base = f"0x{(ev.ImageBase or 0):016X}"
+                print(f"[LOADIMG] pid={ev.ProcessId} image={img} base={base} size={ev.ImageSize} msgId={hdr.MessageId}")
+
             else:
                 print(f"[WARN] unknown tag={tag} msgId={hdr.MessageId}")
 
