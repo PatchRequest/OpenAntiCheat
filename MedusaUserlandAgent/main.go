@@ -36,6 +36,7 @@ const (
 
 var DetectRemotThreadChannel = make(chan any)
 var HandleGuardChannel = make(chan any)
+var DLLInjectionChannel = make(chan any)
 var ToProtectPID int32 = 0
 
 func hresultText(hr uintptr) string {
@@ -130,7 +131,8 @@ func (r *Receiver) Loop() {
 		if toSend != nil {
 			DetectRemotThreadChannel <- toSend
 			HandleGuardChannel <- toSend
-			toSend = nil
+			DLLInjectionChannel <- toSend
+
 		}
 	}
 }
@@ -158,5 +160,6 @@ func main() {
 	defer r.Close()
 	go RemoteThreadDetectorLoop(DetectRemotThreadChannel)
 	go HandleGuardLoop(HandleGuardChannel)
+	go detectDLLInjection(DLLInjectionChannel)
 	r.Loop()
 }

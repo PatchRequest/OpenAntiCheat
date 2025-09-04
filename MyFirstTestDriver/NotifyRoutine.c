@@ -87,6 +87,8 @@ VOID LoadImageNotifyRoutine(
 	}
 	event.ImageBase = ImageInfo->ImageBase;
 	event.ImageSize = ImageInfo->ImageSize;
+
+
 	// Send the event to user-mode via the communication port with FpSendRaw
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
@@ -124,4 +126,3 @@ void unregisterNotifyRoutine() {
 	PsRemoveCreateThreadNotifyRoutine(CreateThreadNotifyRoutine);
 	PsRemoveLoadImageNotifyRoutine(LoadImageNotifyRoutine);
 }
-
