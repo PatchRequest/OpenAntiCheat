@@ -55,6 +55,7 @@ VOID CreateThreadNotifyRoutine(
 	event.isCreate = Create ? 1 : 0;
 	event.ProcessId = (int)(ULONG_PTR)ProcessId;
 	event.ThreadId = (int)(ULONG_PTR)ThreadId;
+	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
 	// Send the event to user-mode via the communication port with FpSendRaw
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);

@@ -41,6 +41,7 @@ typedef struct _CreateThreadNotifyRoutineEvent {
 	int isCreate; // 1 = create, 0 = exit
 	int ProcessId;
 	int ThreadId;
+	int CallerPID;
 } CreateThreadNotifyRoutineEvent, * PCreateThreadNotifyRoutineEvent;
 
 
