@@ -16,9 +16,15 @@ func RemoteThreadDetectorLoop(DetectRemotThreadChannel chan interface{}) {
 }
 
 func checkCreatorPIDAndThreadPID(event CreateThreadNotifyRoutineEvent) bool {
+
 	creatorPID := event.CallerPID
 	threadPID := event.ProcessID
 	threadID := event.ThreadID
+
+	if threadPID != ToProtectPID {
+		return false
+	}
+
 	if creatorPID != threadPID {
 		fmt.Printf("[INFO] Remote thread detected! CreatorPID: %d, ThreadPID: %d, ThreadID: %d\n", creatorPID, threadPID, threadID)
 		return true

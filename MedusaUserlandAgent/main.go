@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -34,6 +35,8 @@ const (
 )
 
 var DetectRemotThreadChannel = make(chan any)
+var HandleGuardChannel = make(chan any)
+var ToProtectPID int32 = 0
 
 func hresultText(hr uintptr) string {
 	code := uint32(hr)
@@ -126,12 +129,27 @@ func (r *Receiver) Loop() {
 		}
 		if toSend != nil {
 			DetectRemotThreadChannel <- toSend
+			HandleGuardChannel <- toSend
 			toSend = nil
 		}
 	}
 }
 
 func main() {
+	// use the cli args to set ToProtectPID
+	if len(os.Args) > 1 {
+		var pid int
+		_, err := fmt.Sscanf(os.Args[1], "%d", &pid)
+		if err != nil {
+			fmt.Printf("Invalid PID argument: %v\n", err)
+			return
+		}
+		ToProtectPID = int32(pid)
+	} else {
+		fmt.Println("Usage: <program> <PID>")
+		return
+	}
+
 	r := NewReceiver(`\MedusaComPort`)
 	if err := r.Connect(); err != nil {
 		fmt.Println(err)
@@ -139,5 +157,6 @@ func main() {
 	}
 	defer r.Close()
 	go RemoteThreadDetectorLoop(DetectRemotThreadChannel)
+	go HandleGuardLoop(HandleGuardChannel)
 	r.Loop()
 }
