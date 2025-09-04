@@ -5,7 +5,7 @@ import "fmt"
 func RemoteThreadDetectorLoop(DetectRemotThreadChannel chan interface{}) {
 	for event := range DetectRemotThreadChannel {
 		switch e := event.(type) {
-		case *CreateThreadNotifyRoutineEvent:
+		case CreateThreadNotifyRoutineEvent:
 			if checkCreatorPIDAndThreadPID(e) {
 				// Additional actions can be taken here if needed
 			}
@@ -15,7 +15,7 @@ func RemoteThreadDetectorLoop(DetectRemotThreadChannel chan interface{}) {
 	}
 }
 
-func checkCreatorPIDAndThreadPID(event *CreateThreadNotifyRoutineEvent) bool {
+func checkCreatorPIDAndThreadPID(event CreateThreadNotifyRoutineEvent) bool {
 	creatorPID := event.CallerPID
 	threadPID := event.ProcessID
 	threadID := event.ThreadID
