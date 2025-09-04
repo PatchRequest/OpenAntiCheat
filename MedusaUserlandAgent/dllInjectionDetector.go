@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
+
+const MEM_IMAGE = 0x1000000
 
 func detectDLLInjection(DLLInjectionChannel chan interface{}) {
 	for event := range DLLInjectionChannel {
@@ -32,48 +33,31 @@ func checkDLLInjection(event LoadImageNotifyRoutineEvent) bool {
 	if AddrInProc(int(processID), base) {
 		return false
 	}
-	if AddrInProc(int(processID), base) {
-		fmt.Printf("[ALERT] DLL Injection detected! ProcessID: %d, DLL: %s\n", processID, imageFile)
-		return true
-	}
+
+	fmt.Printf("[ALERT] DLL Injection detected! ProcessID: %d, DLL: %s\n", processID, imageFile)
+
 	return true
 }
 
-var (
-	k32             = syscall.NewLazyDLL("kernel32.dll")
-	pOpen           = k32.NewProc("OpenProcess")
-	pVirtualQueryEx = k32.NewProc("VirtualQueryEx")
-)
-
-const (
-	PROCESS_QUERY_INFORMATION = 0x0400
-	PROCESS_VM_READ           = 0x0010
-
-	MEM_COMMIT = 0x1000
-)
-
-type MEMORY_BASIC_INFORMATION struct {
-	BaseAddress       uintptr
-	AllocationBase    uintptr
-	AllocationProtect uint32
-	PartitionId       uint16
-	RegionSize        uintptr
-	State             uint32
-	Protect           uint32
-	Type              uint32
-}
-
 func AddrInProc(pid int, addr uintptr) bool {
-	h, _, _ := pOpen.Call(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ, 0, uintptr(pid))
-	if h == 0 {
+	h, err := windows.OpenProcess(
+		windows.PROCESS_QUERY_LIMITED_INFORMATION|windows.PROCESS_VM_READ,
+		false, uint32(pid),
+	)
+	if err != nil {
 		return false
 	}
-	defer pClose.Call(h)
+	defer windows.CloseHandle(h)
 
-	var mbi MEMORY_BASIC_INFORMATION
-	ret, _, _ := pVirtualQueryEx.Call(h, addr, uintptr(unsafe.Pointer(&mbi)), unsafe.Sizeof(mbi))
-	if ret == 0 {
+	var mbi windows.MemoryBasicInformation
+	if err := windows.VirtualQueryEx(
+		h, addr, &mbi, uintptr(unsafe.Sizeof(mbi)),
+	); err != nil {
 		return false
 	}
-	return mbi.State == MEM_COMMIT
+
+	if mbi.State != windows.MEM_COMMIT {
+		return false
+	}
+	return mbi.Type == MEM_IMAGE
 }
