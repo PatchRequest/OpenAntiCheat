@@ -20,14 +20,17 @@ func checkCreatorPIDAndThreadPID(event CreateThreadNotifyRoutineEvent) bool {
 	creatorPID := event.CallerPID
 	threadPID := event.ProcessID
 	threadID := event.ThreadID
+	callerPID := event.CallerPID
 
 	if threadPID != ToProtectPID {
 		return false
 	}
 
 	if creatorPID != threadPID {
-		fmt.Printf("[INFO] Remote thread detected! CreatorPID: %d, ThreadPID: %d, ThreadID: %d\n", creatorPID, threadPID, threadID)
+		fmt.Printf("[INFO] Remote thread detected! CreatorPID: %d, ThreadPID: %d, ThreadID: %d, CallerPID: %d\n", creatorPID, threadPID, threadID, callerPID)
+		ResearchPID(creatorPID)
 		return true
 	}
+
 	return false
 }

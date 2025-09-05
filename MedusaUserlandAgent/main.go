@@ -3,12 +3,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"os"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	_ "modernc.org/sqlite"
 )
 
 const (
@@ -36,8 +38,8 @@ const (
 
 var DetectRemotThreadChannel = make(chan any)
 var HandleGuardChannel = make(chan any)
-var DLLInjectionChannel = make(chan any)
 var ToProtectPID int32 = 0
+var db *sql.DB
 
 func hresultText(hr uintptr) string {
 	code := uint32(hr)
@@ -131,13 +133,19 @@ func (r *Receiver) Loop() {
 		if toSend != nil {
 			DetectRemotThreadChannel <- toSend
 			HandleGuardChannel <- toSend
-			DLLInjectionChannel <- toSend
 
 		}
 	}
 }
 
 func main() {
+
+	db, err := OpenDB("appscore.sqlite")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
 	// use the cli args to set ToProtectPID
 	if len(os.Args) > 1 {
 		var pid int
@@ -160,6 +168,5 @@ func main() {
 	defer r.Close()
 	go RemoteThreadDetectorLoop(DetectRemotThreadChannel)
 	go HandleGuardLoop(HandleGuardChannel)
-	go detectDLLInjection(DLLInjectionChannel)
 	r.Loop()
 }

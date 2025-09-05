@@ -34,6 +34,7 @@ typedef struct _OB_OPERATION_HANDLE_Event {
 	int reserved; // always 2
 	int operation; // OB_OPERATION_HANDLE_CREATE = 0, OB_OPERATION_HANDLE_DUPLICATE = 1
 	int ProcessId;
+	int CallerPID;
 } OB_OPERATION_HANDLE_Event, * POB_OPERATION_HANDLE_Event;
 
 typedef struct _CreateThreadNotifyRoutineEvent {

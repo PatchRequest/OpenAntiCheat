@@ -34,6 +34,7 @@ type OB_OPERATION_HANDLE_Event struct {
 	Reserved  int32
 	Operation int32
 	ProcessID int32
+	CallerPID int32
 }
 
 type CreateThreadNotifyRoutineEvent struct {
@@ -48,7 +49,7 @@ type LoadImageNotifyRoutineEvent struct {
 	Reserved    int32
 	ProcessID   int32
 	ImageFileW  [260]uint16
-	ImageBase   uintptr // PVOID
+	ImageBase   uint64 // PVOID
 	ImageSize   uint32
 	_pad_align_ uint32 // align to 8 on 64-bit, harmless on 32-bit
 }

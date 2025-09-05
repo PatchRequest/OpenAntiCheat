@@ -16,6 +16,7 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
 	TAG_INIT(event, OB_TAG);
 	event.operation = OperationInformation->Operation;
 	event.ProcessId = (int)(ULONG_PTR)pid;
+	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
 	if (!NT_SUCCESS(status)) {
