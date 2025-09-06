@@ -133,5 +133,6 @@ func main() {
 			fmt.Println("recv:", string(b))
 		})
 	defer client.Close()
+	fmt.Println(client)
 	r.Loop()
 }
