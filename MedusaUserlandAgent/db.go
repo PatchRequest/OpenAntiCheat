@@ -95,28 +95,41 @@ func OpenDB(file string) (*sql.DB, error) {
 }
 
 func UpsertApp(ctx context.Context, db *sql.DB, path string) (int64, error) {
+	if db == nil {
+		return 0, errors.New("nil db")
+	}
 	if path == "" {
 		return 0, errors.New("empty path")
 	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = rollbackIfNeeded(tx, &err) }()
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
 
-	// try insert; if exists, fetch id
-	res, ierr := tx.ExecContext(ctx,
-		`INSERT INTO applications(path) VALUES (?) ON CONFLICT(path) DO NOTHING`, path)
-	if ierr != nil {
-		return 0, ierr
-	}
-	if id, _ := res.LastInsertId(); id > 0 {
+	// Preferred (SQLite ≥3.35): RETURNING gives the correct id even on conflict
+	var id int64
+	row := tx.QueryRowContext(ctx, `
+		INSERT INTO applications(path)
+		VALUES (?)
+		ON CONFLICT(path) DO UPDATE SET path=excluded.path
+		RETURNING id
+	`, path)
+	if e := row.Scan(&id); e == nil {
 		err = tx.Commit()
 		return id, err
 	}
-	var id int64
-	err = tx.QueryRowContext(ctx, `SELECT id FROM applications WHERE path = ?`, path).Scan(&id)
-	if err != nil {
+
+	// Fallback (older SQLite): INSERT OR IGNORE + SELECT id
+	if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO applications(path) VALUES (?)`, path); err != nil {
+		return 0, err
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM applications WHERE path = ?`, path).Scan(&id); err != nil {
 		return 0, err
 	}
 	err = tx.Commit()

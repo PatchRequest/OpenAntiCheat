@@ -139,8 +139,8 @@ func (r *Receiver) Loop() {
 }
 
 func main() {
-
-	db, err := OpenDB("appscore.sqlite")
+	var err error
+	db, err = OpenDB("appscore.sqlite")
 	if err != nil {
 		panic(err)
 	}
