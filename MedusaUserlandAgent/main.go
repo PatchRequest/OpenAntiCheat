@@ -114,10 +114,6 @@ func (r *Receiver) Loop() {
 
 func main() {
 
-	// create HydraWS
-
-	// use the cli args to set ToProtectPID
-
 	var pid int
 	_, err := fmt.Sscanf(os.Args[1], "%d", &pid)
 	if err != nil {
