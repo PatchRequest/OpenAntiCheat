@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -147,16 +148,17 @@ func (h *HydraWSServer) handleWS(w http.ResponseWriter, r *http.Request) {
 // ---------- minimal main ----------
 
 func main() {
-	s := NewHydraWSServer(":8080", "/ws", 1024)
+	s := NewHydraWSServer("0.0.0.0:8080", "/", 1024)
 	if err := s.Start(); err != nil {
 		log.Fatal(err)
 	}
-	log.Println("listening on :8080 /ws")
+	log.Println("listening on :8080 /")
 
 	// consumer
 	go func() {
 		for ev := range s.Recv {
-			log.Printf("event type=%s pid=%d op=%d", ev.Type, ev.ProcessID, ev.Operation)
+			fmt.Printf("%+v\n", ev)
+
 		}
 	}()
 
