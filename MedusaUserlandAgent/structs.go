@@ -103,3 +103,23 @@ func (r *Receiver) Close() {
 		r.hPort = 0
 	}
 }
+
+func hresultText(hr uintptr) string {
+	code := uint32(hr)
+	// map HRESULT from 0x80070000 to Win32
+	if (hr & 0xFFFF0000) == 0x80070000 {
+		code = uint32(hr & 0xFFFF)
+	}
+	var buf [512]uint16
+	r0, _, _ := pFmtMsgW.Call(
+		FMT_FROM_SYSTEM|FMT_IGNORE_INSERTS,
+		0, uintptr(code), 0,
+		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), 0,
+	)
+	if r0 == 0 {
+		return ""
+	}
+	return windows.UTF16ToString(buf[:])
+}
+
+// ------------------- utility functions -------------------

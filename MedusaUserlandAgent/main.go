@@ -3,7 +3,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -36,37 +35,8 @@ const (
 	FMT_IGNORE_INSERTS = 0x00000200
 )
 
-var DetectRemotThreadChannel = make(chan any)
-var HandleGuardChannel = make(chan any)
 var ToProtectPID int32 = 0
-var db *sql.DB
-
-func hresultText(hr uintptr) string {
-	code := uint32(hr)
-	// map HRESULT from 0x80070000 to Win32
-	if (hr & 0xFFFF0000) == 0x80070000 {
-		code = uint32(hr & 0xFFFF)
-	}
-	var buf [512]uint16
-	r0, _, _ := pFmtMsgW.Call(
-		FMT_FROM_SYSTEM|FMT_IGNORE_INSERTS,
-		0, uintptr(code), 0,
-		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), 0,
-	)
-	if r0 == 0 {
-		return ""
-	}
-	return windows.UTF16ToString(buf[:])
-}
-
-func u16zToString(buf []uint16) string {
-	for i, v := range buf {
-		if v == 0 {
-			return windows.UTF16ToString(buf[:i])
-		}
-	}
-	return windows.UTF16ToString(buf)
-}
+var EventChannel = make(chan Event, 100)
 
 func (r *Receiver) Loop() {
 	hdrSz := uint32(unsafe.Sizeof(filterMessageHeader{}))
@@ -101,64 +71,60 @@ func (r *Receiver) Loop() {
 
 		payload := buf[hdrSz : hdrSz+maxSz]
 		tag := int32(binary.LittleEndian.Uint32(payload[0:4]))
-		var toSend interface{}
+		var toSendEvent Event
 		switch tag {
 		case PROC_TAG:
 			var ev CreateProcessNotifyRoutineEvent
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szProc])
-			toSend = ev
+			toSendEvent = FromCreateProcess(ev)
 		case FLT_TAG:
 			var ev FLT_PREOP_CALLBACK_Event
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szFlt])
-			toSend = ev
+			toSendEvent = FromFLT(ev)
 
 		case OB_TAG:
 			var ev OB_OPERATION_HANDLE_Event
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szOb])
-			toSend = ev
+			toSendEvent = FromOB(ev)
 
 		case THREAD_TAG:
 			var ev CreateThreadNotifyRoutineEvent
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szThr])
-			toSend = ev
+			toSendEvent = FromThread(ev)
 
 		case LOADIMG_TAG:
 			var ev LoadImageNotifyRoutineEvent
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szImg])
-			toSend = ev
+			toSendEvent = FromLoadImage(ev)
 
 		default:
 			fmt.Printf("[WARN] unknown tag=%d msgId=%d\n", tag, hdr.MessageId)
 		}
-		if toSend != nil {
-			DetectRemotThreadChannel <- toSend
-			HandleGuardChannel <- toSend
-
+		enrich(&toSendEvent)
+		EventChannel <- toSendEvent
+		jsonData, err := toSendEvent.JSON()
+		if err != nil {
+			fmt.Printf("[ERR] JSON marshal: %v\n", err)
+			continue
 		}
+
+		fmt.Println(string(jsonData))
 	}
 }
 
 func main() {
-	var err error
-	db, err = OpenDB("appscore.sqlite")
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
+
+	// create HydraWS
 
 	// use the cli args to set ToProtectPID
-	if len(os.Args) > 1 {
-		var pid int
-		_, err := fmt.Sscanf(os.Args[1], "%d", &pid)
-		if err != nil {
-			fmt.Printf("Invalid PID argument: %v\n", err)
-			return
-		}
-		ToProtectPID = int32(pid)
-	} else {
-		fmt.Println("Usage: <program> <PID>")
+
+	var pid int
+	_, err := fmt.Sscanf(os.Args[1], "%d", &pid)
+	if err != nil {
+		fmt.Printf("Invalid PID argument: %v\n", err)
 		return
 	}
+	ToProtectPID = int32(pid)
 
 	r := NewReceiver(`\MedusaComPort`)
 	if err := r.Connect(); err != nil {
@@ -166,7 +132,10 @@ func main() {
 		return
 	}
 	defer r.Close()
-	go RemoteThreadDetectorLoop(DetectRemotThreadChannel)
-	go HandleGuardLoop(HandleGuardChannel)
+	client := NewHydraWS(os.Args[2], EventChannel).
+		WithOnMessage(func(b []byte) {
+			fmt.Println("recv:", string(b))
+		})
+	defer client.Close()
 	r.Loop()
 }
