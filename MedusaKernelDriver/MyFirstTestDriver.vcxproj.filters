@@ -49,9 +49,6 @@
     <ClCompile Include="Coms.c">
       <Filter>Source Files\Coms</Filter>
     </ClCompile>
-    <ClCompile Include="JsonBuilder.c">
-      <Filter>Source Files\JsonBuilder</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Callback.h">
@@ -71,9 +68,6 @@
     </ClInclude>
     <ClInclude Include="ComsEvents.h">
       <Filter>Source Files\Coms</Filter>
-    </ClInclude>
-    <ClInclude Include="JsonBuilder.h">
-      <Filter>Source Files\JsonBuilder</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
