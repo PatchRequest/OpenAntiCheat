@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"math"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -46,10 +49,18 @@ func NewHydraWS(url string, eventCh <-chan Event) *HydraWS {
 		OnMessage: func([]byte) {},
 		extCh:     eventCh,
 		sendCh:    make(chan []byte, 1024),
-		dialer:    &websocket.Dialer{HandshakeTimeout: 10 * time.Second, EnableCompression: true},
-		pingIntv:  20 * time.Second,
-		ctx:       ctx,
-		cancel:    cancel,
+		dialer: &websocket.Dialer{
+			HandshakeTimeout:  8 * time.Second,
+			EnableCompression: true,
+			Proxy:             nil, // bypass system/corp proxy which often breaks WS on LAN
+			NetDialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+		},
+		pingIntv: 20 * time.Second,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 	h.backoff.initial = 500 * time.Millisecond
 	h.backoff.max = 30 * time.Second
@@ -172,18 +183,29 @@ func (h *HydraWS) connect() error {
 	if h.ctx.Err() != nil {
 		return context.Canceled
 	}
-	conn, _, err := h.dialer.DialContext(h.ctx, h.URL, h.Header)
+
+	// per-attempt timeout (independent of backoff)
+	ctx, cancel := context.WithTimeout(h.ctx, 8*time.Second)
+	defer cancel()
+
+	fmt.Println("dial:", h.URL)
+	conn, resp, err := h.dialer.DialContext(ctx, h.URL, h.Header)
 	if err != nil {
+		if resp != nil {
+			b, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			fmt.Printf("dial err: %v status=%s\nhdr: %v\nbody: %s\n", err, resp.Status, resp.Header, string(b))
+		} else {
+			fmt.Printf("dial err (no HTTP resp): %v\n", err)
+		}
 		return err
 	}
-	conn.SetReadLimit(16 << 20)
-	conn.SetPongHandler(func(string) error {
-		_ = conn.SetReadDeadline(time.Now().Add(2 * h.pingIntv))
-		return nil
-	})
+
+	conn.SetReadLimit(16 << 20) // no SetPongHandler
 	h.connMu.Lock()
 	h.conn = conn
 	h.connMu.Unlock()
+	fmt.Println("connected to:", conn.LocalAddr(), "->", conn.RemoteAddr())
 	return nil
 }
 

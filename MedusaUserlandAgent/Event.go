@@ -65,6 +65,7 @@ func FromCreateProcess(e CreateProcessNotifyRoutineEvent) Event {
 		ImageFile: utf16BufToString(e.ImageFileW[:]),
 		Command:   utf16BufToString(e.CommandLineW[:]),
 		Reserved:  e.Reserved,
+		CallerPID: e.ProcessID,
 	}
 }
 
@@ -75,6 +76,7 @@ func FromFLT(e FLT_PREOP_CALLBACK_Event) Event {
 		Operation: e.Operation,
 		FileName:  utf16BufToString(e.FileNameW[:]),
 		Reserved:  e.Reserved,
+		CallerPID: e.ProcessID,
 	}
 }
 
@@ -108,14 +110,15 @@ func FromLoadImage(e LoadImageNotifyRoutineEvent) Event {
 		ImageBase: e.ImageBase,
 		ImageSize: e.ImageSize,
 		Reserved:  e.Reserved,
+		CallerPID: e.ProcessID,
 	}
 }
 
 func enrich(ev *Event) {
-	if ev.ProcessID == 0 {
+	if ev.CallerPID == 0 {
 		return
 	}
-	if p, err := getPath(ev.ProcessID); err == nil {
+	if p, err := getPath(ev.CallerPID); err == nil {
 		ev.Path = p
 		if age, err := getExeAge(p); err == nil {
 			ev.PathAge = int64(age.Second())
@@ -124,7 +127,7 @@ func enrich(ev *Event) {
 			ev.PathHash = h
 		}
 	}
-	if life, err := getProcessLifetime(ev.ProcessID); err == nil {
+	if life, err := getProcessLifetime(ev.CallerPID); err == nil {
 		ev.Lifetime = int64(life)
 	}
 	ev.ToProctedPID = ToProtectPID
