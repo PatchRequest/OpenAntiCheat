@@ -100,7 +100,7 @@ func (r *Receiver) Loop() {
 		default:
 			fmt.Printf("[WARN] unknown tag=%d msgId=%d\n", tag, hdr.MessageId)
 		}
-		//enrich(&toSendEvent)
+		enrich(&toSendEvent)
 		EventChannel <- toSendEvent
 		jsonData, err := toSendEvent.JSON()
 		if err != nil {

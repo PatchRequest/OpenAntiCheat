@@ -316,7 +316,6 @@ func ProcessEvent(payload []byte, tag int32, hdr filterMessageHeader) {
 		var ev CreateThreadNotifyRoutineEvent
 		copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szThr])
 		toSendEvent = FromThread(ev)
-		fmt.Printf("THREAD_TAG (tag=%d): %+v\n", tag, ev)
 
 	case LOADIMG_TAG:
 		var ev LoadImageNotifyRoutineEvent

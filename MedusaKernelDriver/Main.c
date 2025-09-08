@@ -28,9 +28,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
     g_RegPath.Length = g_RegPath.MaximumLength = RegistryPath->Length;
     DbgPrint("Parameter Key copy: %wZ\n", g_RegPath);
 
-    
-
-
 
     NTSTATUS st;
     st = createRegistration();
