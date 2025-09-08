@@ -1,13 +1,17 @@
 #include "Callback.h"
-#define PROCESS_VM_WRITE 0x0020
+#define PROCESS_VM_READ       0x0010
+#define PROCESS_VM_WRITE      0x0020
+#define PROCESS_VM_OPERATION  0x0008
 PVOID callbackRegistrationHandle = NULL;
+
+
 
 OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION OperationInformation) {
     UNREFERENCED_PARAMETER(RegistrationContext);
     UNREFERENCED_PARAMETER(OperationInformation);
 
     PEPROCESS Process = (PEPROCESS)OperationInformation->Object;
-    if (OperationInformation->KernelHandle == 1) {
+    if (OperationInformation->KernelHandle || OperationInformation->ObjectType != *PsProcessType) {
         return OB_PREOP_SUCCESS;
     }
     if (ToProtectPID == 99133799) {
@@ -18,6 +22,14 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
     HANDLE pid = PsGetProcessId(Process);
     if ((LONG)pid != ToProtectPID) {
         return OB_PREOP_SUCCESS;
+    }
+    const ACCESS_MASK deny = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | GENERIC_READ | GENERIC_WRITE;
+    if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
+        OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~deny;
+    }
+    else { // OB_OPERATION_HANDLE_DUPLICATE
+        OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &=
+            ~deny;
     }
 
 	OB_OPERATION_HANDLE_Event event = { 0 };
