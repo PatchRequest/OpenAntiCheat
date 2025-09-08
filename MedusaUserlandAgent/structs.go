@@ -83,17 +83,24 @@ func (r *Receiver) Connect() error {
 	if err != nil {
 		return err
 	}
+
 	var h windows.Handle
+	pid := ToProtectPID // int32 global you already have
 	ret, _, _ := pConnect.Call(
-		uintptr(unsafe.Pointer(u16)),
-		0, 0, 0, 0,
-		uintptr(unsafe.Pointer(&h)),
+		uintptr(unsafe.Pointer(u16)),  // LPCWSTR PortName
+		0,                             // DWORD Options
+		uintptr(unsafe.Pointer(&pid)), // PVOID  Context
+		uintptr(unsafe.Sizeof(pid)),   // WORD   SizeOfContext (bytes)
+		0,                             // PSECURITY_ATTRIBUTES
+		uintptr(unsafe.Pointer(&h)),   // HANDLE* Port
 	)
 	if ret != S_OK {
-		return fmt.Errorf("FilterConnectCommunicationPort failed: 0x%08X %s", uint32(ret), hresultText(ret))
+		return fmt.Errorf("FilterConnectCommunicationPort failed: 0x%08X %s",
+			uint32(ret), hresultText(ret))
 	}
+
 	r.hPort = h
-	fmt.Printf("[OK] Connected %s\n", r.name)
+	fmt.Printf("[OK] Connected %s, sent ToProtectPID=%d\n", r.name, pid)
 	return nil
 }
 

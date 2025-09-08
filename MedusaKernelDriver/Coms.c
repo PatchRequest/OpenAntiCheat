@@ -50,28 +50,32 @@ VOID MinifltPortFinalize(void)
 }
 
 
+volatile LONG ToProtectPID = 99133799;
 //
 // This function will be call when
 // user mode application calls FilterConnectCommunicationPort
 //
 NTSTATUS MinifltPortNotifyRoutine(
-	_In_ PFLT_PORT connected_client_port,
-	_In_ PVOID server_cookie,
-	_In_ PVOID connection_context,
-	_In_ ULONG connection_context_size,
+	_In_  PFLT_PORT connected_client_port,
+	_In_  PVOID server_cookie,
+	_In_  PVOID connection_context,
+	_In_  ULONG connection_context_size,
 	_Out_ PVOID* connection_port_cookie
 ) {
 	UNREFERENCED_PARAMETER(server_cookie);
-	UNREFERENCED_PARAMETER(connection_context);
-	UNREFERENCED_PARAMETER(connection_context_size);
 	UNREFERENCED_PARAMETER(connection_port_cookie);
 
-	DbgPrint(
-		"[filterport] " __FUNCTION__ " User-mode application(%u) connect to this filter\n",
-		PtrToUint(PsGetCurrentProcessId())
-	);
-
 	client_port = connected_client_port;
+
+	if (connection_context && connection_context_size >= sizeof(LONG)) {
+		LONG v = *(const LONG*)connection_context;
+		InterlockedExchange(&ToProtectPID, v);
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
+			"ToProtectPID set to %ld\n", ToProtectPID);
+	}
+
+	DbgPrint("[filterport] %s pid=%u connected\n", __FUNCTION__,
+		PtrToUint(PsGetCurrentProcessId()));
 
 	return STATUS_SUCCESS;
 }

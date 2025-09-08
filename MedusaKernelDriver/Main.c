@@ -7,6 +7,7 @@
 
 
 UNICODE_STRING g_RegPath;
+int toProtect;
 
 void UnloadMe(PDRIVER_OBJECT);
 

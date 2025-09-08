@@ -10,8 +10,15 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
     if (OperationInformation->KernelHandle == 1) {
         return OB_PREOP_SUCCESS;
     }
-    return OB_PREOP_SUCCESS;
+    if (ToProtectPID == 99133799) {
+        return OB_PREOP_SUCCESS;
+    }
+
+    
     HANDLE pid = PsGetProcessId(Process);
+    if ((LONG)pid != ToProtectPID) {
+        return OB_PREOP_SUCCESS;
+    }
 
 	OB_OPERATION_HANDLE_Event event = { 0 };
 	TAG_INIT(event, OB_TAG);
@@ -21,10 +28,8 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
 	if (!NT_SUCCESS(status)) {
-		//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,"FpSendRaw failed with status 0x%08X\n", status);
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,"FpSendRaw failed with status 0x%08X\n", status);
 	}
-
-
     return OB_PREOP_SUCCESS;
 }
 

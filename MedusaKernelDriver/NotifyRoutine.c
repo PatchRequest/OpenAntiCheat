@@ -49,20 +49,16 @@ VOID CreateThreadNotifyRoutine(
 		// ignore thread exit events
 		return;
 	}
-
+	if (ToProtectPID == 99133799) {
+		return;
+	}
+	if ((LONG)ProcessId != ToProtectPID) {
+		return;
+	}
+	
 	ULONG_PTR pid = (ULONG_PTR)ProcessId;   // target process
 	ULONG_PTR tid = (ULONG_PTR)ThreadId;
 	ULONG_PTR caller = (ULONG_PTR)PsGetCurrentProcessId(); // creator’s PID (context of creator)
-
-	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-		"THREAD %s: targetPID=%llu tid=%llu callerPID=%llu\n",
-		Create ? "CREATE" : "EXIT",
-		(unsigned long long)pid,
-		(unsigned long long)tid,
-		(unsigned long long)caller);
-
-
-	// print with DbgPrintEx
 
 	//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Thread created proc %d\n", (unsigned long long)ProcessId);
 	CreateThreadNotifyRoutineEvent ev = { 0 };
@@ -88,6 +84,12 @@ VOID LoadImageNotifyRoutine(
 	UNREFERENCED_PARAMETER(FullImageName);
 	UNREFERENCED_PARAMETER(ProcessId);
 	UNREFERENCED_PARAMETER(ImageInfo);
+	if (ToProtectPID == 99133799) {
+		return;
+	}
+	if ((LONG)ProcessId != ToProtectPID) {
+		return;
+	}
 
 	LoadImageNotifyRoutineEvent event = { 0 };
 	TAG_INIT(event, LOADIMG_TAG);
