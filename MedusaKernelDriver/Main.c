@@ -44,7 +44,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
 	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 		"registerNotifyRoutine() returned 0x%08X\n", st);
 
-	st = BindToExistingFilterAndCreatePort(L"TestDriver");
+	st = BindToExistingFilterAndCreatePort(L"MedusaKernelDriver");
 	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
 		"createRegistrationComFilter() returned 0x%08X\n", st);
 

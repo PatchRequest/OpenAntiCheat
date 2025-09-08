@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/gorilla/websocket"
 )
@@ -288,4 +289,53 @@ func (h *HydraWS) nextBackoff(n int) time.Duration {
 		d += time.Duration(time.Now().UnixNano() % int64(j))
 	}
 	return d
+}
+func ProcessEvent(payload []byte, tag int32, hdr filterMessageHeader) {
+	szProc := uint32(unsafe.Sizeof(CreateProcessNotifyRoutineEvent{}))
+	szThr := uint32(unsafe.Sizeof(CreateThreadNotifyRoutineEvent{}))
+	szFlt := uint32(unsafe.Sizeof(FLT_PREOP_CALLBACK_Event{}))
+	szOb := uint32(unsafe.Sizeof(OB_OPERATION_HANDLE_Event{}))
+	szImg := uint32(unsafe.Sizeof(LoadImageNotifyRoutineEvent{}))
+	var toSendEvent Event
+	switch tag {
+	case PROC_TAG:
+		var ev CreateProcessNotifyRoutineEvent
+		copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szProc])
+		toSendEvent = FromCreateProcess(ev)
+	case FLT_TAG:
+		var ev FLT_PREOP_CALLBACK_Event
+		copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szFlt])
+		toSendEvent = FromFLT(ev)
+
+	case OB_TAG:
+		var ev OB_OPERATION_HANDLE_Event
+		copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szOb])
+		toSendEvent = FromOB(ev)
+
+	case THREAD_TAG:
+		var ev CreateThreadNotifyRoutineEvent
+		copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szThr])
+		toSendEvent = FromThread(ev)
+		fmt.Printf("THREAD_TAG (tag=%d): %+v\n", tag, ev)
+
+	case LOADIMG_TAG:
+		var ev LoadImageNotifyRoutineEvent
+		copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szImg])
+		toSendEvent = FromLoadImage(ev)
+
+	default:
+		fmt.Printf("[WARN] unknown tag=%d msgId=%d\n", tag, hdr.MessageId)
+	}
+	enrich(&toSendEvent)
+
+	EventChannel <- toSendEvent
+	if toSendEvent.Type == "create_thread" {
+		jsonData, err := toSendEvent.JSON()
+		if err != nil {
+			fmt.Printf("[ERR] JSON marshal: %v\n", err)
+		}
+		_ = jsonData
+		//fmt.Println(string(jsonData))
+	}
+
 }

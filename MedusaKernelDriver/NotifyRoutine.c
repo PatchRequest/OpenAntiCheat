@@ -36,8 +36,7 @@ VOID CreateProcessNotifyRoutineEx(
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
 	if (!NT_SUCCESS(status)) {
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"FpSendRaw failed with status 0x%08X\n", status);
+		//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,"FpSendRaw failed with status 0x%08X\n", status);
 	}
 }
 
@@ -46,22 +45,36 @@ VOID CreateThreadNotifyRoutine(
 	_In_ HANDLE ThreadId,
 	_In_ BOOLEAN Create
 ) {
-	UNREFERENCED_PARAMETER(ProcessId);
-	UNREFERENCED_PARAMETER(ThreadId);
-	UNREFERENCED_PARAMETER(Create);
+	if (!Create) {
+		// ignore thread exit events
+		return;
+	}
 
-	CreateThreadNotifyRoutineEvent event = { 0 };
-	TAG_INIT(event, THREAD_TAG);
-	event.isCreate = Create ? 1 : 0;
-	event.ProcessId = (int)(ULONG_PTR)ProcessId;
-	event.ThreadId = (int)(ULONG_PTR)ThreadId;
-	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
-	// Send the event to user-mode via the communication port with FpSendRaw
-	ULONG sentBytes = 0;
-	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
-	if (!NT_SUCCESS(status)) {
+	ULONG_PTR pid = (ULONG_PTR)ProcessId;   // target process
+	ULONG_PTR tid = (ULONG_PTR)ThreadId;
+	ULONG_PTR caller = (ULONG_PTR)PsGetCurrentProcessId(); // creator’s PID (context of creator)
+
+	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
+		"THREAD %s: targetPID=%llu tid=%llu callerPID=%llu\n",
+		Create ? "CREATE" : "EXIT",
+		(unsigned long long)pid,
+		(unsigned long long)tid,
+		(unsigned long long)caller);
+
+
+	// print with DbgPrintEx
+
+	//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Thread created proc %d\n", (unsigned long long)ProcessId);
+	CreateThreadNotifyRoutineEvent ev = { 0 };
+	TAG_INIT(ev, THREAD_TAG);
+	ev.isCreate = Create ? 1 : 0;
+	ev.ProcessId = (int)pid;       // target
+	ev.ThreadId = (int)tid;
+	ev.CallerPID = (int)caller;    // creator
+	ULONG sent = 0; NTSTATUS st = FpSendRaw(&ev, sizeof(ev), NULL, 0, &sent);
+	if (!NT_SUCCESS(st)) {
 		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"FpSendRaw failed with status 0x%08X\n", status);
+			"FpSendRaw: 0x%08X (sent=%lu)\n", st, sent);
 	}
 }
 
@@ -93,8 +106,7 @@ VOID LoadImageNotifyRoutine(
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
 	if (!NT_SUCCESS(status)) {
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"FpSendRaw failed with status 0x%08X\n", status);
+		//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,"FpSendRaw failed with status 0x%08X\n", status);
 	}
 }
 

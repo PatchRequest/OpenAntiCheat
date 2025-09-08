@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"runtime"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -19,6 +21,10 @@ const (
 	OB_TAG      = 2
 	THREAD_TAG  = 3
 	LOADIMG_TAG = 4
+
+	readers  = 4    // try 4..8
+	workers  = 8    // try NumCPU()*2
+	queueCap = 8192 // backlog
 )
 
 var (
@@ -38,23 +44,48 @@ const (
 var ToProtectPID int32 = 0
 var EventChannel = make(chan Event, 100)
 
-func (r *Receiver) Loop() {
-	hdrSz := uint32(unsafe.Sizeof(filterMessageHeader{}))
+// ---- fast intake plumbing ----
+
+type item struct {
+	hdr     filterMessageHeader
+	payload []byte  // view into buf[hdrSz:]
+	buf     *[]byte // return to pool after processing
+}
+
+var (
+	onceSizes sync.Once
+	hdrSz     uint32
+	maxSz     uint32
+	bufPool   sync.Pool
+)
+
+func computeSizes() {
+	hdrSz = uint32(unsafe.Sizeof(filterMessageHeader{}))
 	szProc := uint32(unsafe.Sizeof(CreateProcessNotifyRoutineEvent{}))
 	szThr := uint32(unsafe.Sizeof(CreateThreadNotifyRoutineEvent{}))
 	szFlt := uint32(unsafe.Sizeof(FLT_PREOP_CALLBACK_Event{}))
 	szOb := uint32(unsafe.Sizeof(OB_OPERATION_HANDLE_Event{}))
 	szImg := uint32(unsafe.Sizeof(LoadImageNotifyRoutineEvent{}))
-
-	maxSz := szProc
+	maxSz = szProc
 	for _, s := range []uint32{szThr, szFlt, szOb, szImg} {
 		if s > maxSz {
 			maxSz = s
 		}
 	}
-	buf := make([]byte, hdrSz+maxSz)
+	bufPool = sync.Pool{
+		New: func() any {
+			b := make([]byte, hdrSz+maxSz) // one buffer per in-flight read
+			return &b
+		},
+	}
+}
 
+func (r *Receiver) readLoop(jobs chan<- item) {
+	runtime.LockOSThread()
 	for {
+		bptr := bufPool.Get().(*[]byte)
+		buf := *bptr
+
 		ret, _, _ := pGetMsg.Call(
 			uintptr(r.hPort),
 			uintptr(unsafe.Pointer(&buf[0])),
@@ -63,53 +94,43 @@ func (r *Receiver) Loop() {
 		)
 		if ret != S_OK {
 			fmt.Printf("[ERR] FilterGetMessage 0x%08X (%s)\n", uint32(ret), hresultText(ret))
-			continue
-		}
-		// Parse header
-		var hdr filterMessageHeader
-		copy((*[unsafe.Sizeof(hdr)]byte)(unsafe.Pointer(&hdr))[:], buf[:hdrSz])
-
-		payload := buf[hdrSz : hdrSz+maxSz]
-		tag := int32(binary.LittleEndian.Uint32(payload[0:4]))
-		var toSendEvent Event
-		switch tag {
-		case PROC_TAG:
-			var ev CreateProcessNotifyRoutineEvent
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szProc])
-			toSendEvent = FromCreateProcess(ev)
-		case FLT_TAG:
-			var ev FLT_PREOP_CALLBACK_Event
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szFlt])
-			toSendEvent = FromFLT(ev)
-
-		case OB_TAG:
-			var ev OB_OPERATION_HANDLE_Event
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szOb])
-			toSendEvent = FromOB(ev)
-
-		case THREAD_TAG:
-			var ev CreateThreadNotifyRoutineEvent
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szThr])
-			toSendEvent = FromThread(ev)
-
-		case LOADIMG_TAG:
-			var ev LoadImageNotifyRoutineEvent
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szImg])
-			toSendEvent = FromLoadImage(ev)
-
-		default:
-			fmt.Printf("[WARN] unknown tag=%d msgId=%d\n", tag, hdr.MessageId)
-		}
-		enrich(&toSendEvent)
-		EventChannel <- toSendEvent
-		jsonData, err := toSendEvent.JSON()
-		if err != nil {
-			fmt.Printf("[ERR] JSON marshal: %v\n", err)
+			bufPool.Put(bptr)
 			continue
 		}
 
-		fmt.Println(string(jsonData))
+		// parse header without alloc
+		hdr := *(*filterMessageHeader)(unsafe.Pointer(&buf[0]))
+		payload := buf[hdrSz : hdrSz+maxSz] // view only, no copy
+
+		jobs <- item{hdr: hdr, payload: payload, buf: bptr} // ownership of buffer moves to worker
 	}
+}
+
+func worker(jobs <-chan item) {
+	for it := range jobs {
+		tag := int32(binary.LittleEndian.Uint32(it.payload[0:4]))
+		ProcessEvent(it.payload, tag, it.hdr) // unchanged, handles decode + enrich + send
+		// return buffer
+		bufPool.Put(it.buf)
+	}
+}
+
+func (r *Receiver) Loop() {
+	onceSizes.Do(computeSizes)
+
+	jobs := make(chan item, queueCap)
+
+	// start workers
+	for i := 0; i < workers; i++ {
+		go worker(jobs)
+	}
+	// start multiple blocking readers
+	for i := 0; i < readers; i++ {
+		go r.readLoop(jobs)
+	}
+
+	// block forever
+	select {}
 }
 
 func main() {

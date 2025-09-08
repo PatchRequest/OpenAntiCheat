@@ -155,7 +155,7 @@ NTSTATUS MinifltPortSendMessage(
 	}
 	else {
 		LARGE_INTEGER timeout;
-		timeout.QuadPart = 0;
+		timeout.QuadPart = -10;
 
 		status = FltSendMessage( // just sending
 			flt_handle,

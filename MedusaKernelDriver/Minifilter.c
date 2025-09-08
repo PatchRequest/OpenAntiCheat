@@ -65,13 +65,13 @@ PreOperationCreate(
 		wcsncpy_s(event.FileName, 260, Data->Iopb->TargetFileObject->FileName.Buffer, _TRUNCATE);
 	}
     // send to usermode
-	ULONG sentBytes = 0;
-	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
-	if (!NT_SUCCESS(status)) {
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"FpSendRaw failed with status 0x%08X\n", status);
-	}
-    return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	//ULONG sentBytes = 0;
+	//NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
+	//if (!NT_SUCCESS(status)) {
+	//	DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+	//		"FpSendRaw failed with status 0x%08X\n", status);
+	//}
+    //return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
 NTSTATUS createRegistrationMiniFilter(PDRIVER_OBJECT DriverObject) {
