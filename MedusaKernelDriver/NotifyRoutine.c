@@ -84,12 +84,6 @@ VOID LoadImageNotifyRoutine(
 	UNREFERENCED_PARAMETER(FullImageName);
 	UNREFERENCED_PARAMETER(ProcessId);
 	UNREFERENCED_PARAMETER(ImageInfo);
-	if (ToProtectPID == 99133799) {
-		return;
-	}
-	if ((LONG)ProcessId != ToProtectPID) {
-		return;
-	}
 
 	LoadImageNotifyRoutineEvent event = { 0 };
 	TAG_INIT(event, LOADIMG_TAG);

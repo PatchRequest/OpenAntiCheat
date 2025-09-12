@@ -28,8 +28,7 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
         OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~deny;
     }
     else { // OB_OPERATION_HANDLE_DUPLICATE
-        OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &=
-            ~deny;
+        OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &= ~deny;
     }
 
 	OB_OPERATION_HANDLE_Event event = { 0 };

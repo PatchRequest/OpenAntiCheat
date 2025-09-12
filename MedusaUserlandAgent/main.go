@@ -37,6 +37,7 @@ const (
 
 var ToProtectPID int32 = 0
 var EventChannel = make(chan Event, 100)
+var toInjectDLL string = ""
 
 func (r *Receiver) Loop() {
 	hdrSz := uint32(unsafe.Sizeof(filterMessageHeader{}))
@@ -77,6 +78,9 @@ func (r *Receiver) Loop() {
 			var ev CreateProcessNotifyRoutineEvent
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szProc])
 			toSendEvent = FromCreateProcess(ev)
+			if ev.IsCreate != 0 {
+				injectDLLIntoPID(int(ev.ProcessID), toInjectDLL)
+			}
 		case FLT_TAG:
 			var ev FLT_PREOP_CALLBACK_Event
 			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szFlt])
@@ -107,7 +111,6 @@ func (r *Receiver) Loop() {
 			fmt.Printf("[ERR] JSON marshal: %v\n", err)
 			continue
 		}
-
 		fmt.Println(string(jsonData))
 	}
 }
@@ -115,12 +118,16 @@ func (r *Receiver) Loop() {
 func main() {
 
 	var pid int
+
 	_, err := fmt.Sscanf(os.Args[1], "%d", &pid)
 	if err != nil {
 		fmt.Printf("Invalid PID argument: %v\n", err)
 		return
 	}
+
 	ToProtectPID = int32(pid)
+	toInjectDLL = os.Args[3]
+	fmt.Println(toInjectDLL)
 
 	r := NewReceiver(`\MedusaComPort`)
 	if err := r.Connect(); err != nil {
