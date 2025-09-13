@@ -3,52 +3,65 @@
 #include "MinHook.h"
 #pragma comment(lib, "user32.lib")
 
-typedef LONG NTSTATUS;
-#define STATUS_ACCESS_DENIED ((NTSTATUS)0xC0000022L)
+typedef HANDLE(WINAPI* CreateRemoteThreadEx_t)(
+    HANDLE, LPSECURITY_ATTRIBUTES, SIZE_T, LPTHREAD_START_ROUTINE,
+    LPVOID, DWORD, LPPROC_THREAD_ATTRIBUTE_LIST, LPDWORD);
 
-typedef struct _UNICODE_STRING { USHORT Length, MaximumLength; PWSTR Buffer; } UNICODE_STRING, * PUNICODE_STRING;
-typedef struct _OBJECT_ATTRIBUTES {
-    ULONG Length; HANDLE RootDirectory; PUNICODE_STRING ObjectName;
-    ULONG Attributes; PVOID SecurityDescriptor; PVOID SecurityQualityOfService;
-} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
-
-typedef NTSTATUS(NTAPI* NtCreateThreadEx_t)(
-    PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, PVOID, PVOID,
-    ULONG, SIZE_T, SIZE_T, SIZE_T, PVOID);
-
-static NtCreateThreadEx_t RealNtCreateThreadEx = nullptr;
+static CreateRemoteThreadEx_t RealCreateRemoteThreadEx = nullptr;
+static volatile LONG g_inPopup = 0; // reentrancy guard (CreateThread may call CRTEx internally)
 
 static DWORD WINAPI MsgThread(LPVOID) {
-    MessageBoxW(NULL, L"Blocked NtCreateThreadEx", L"AntiCheat", MB_OK | MB_TOPMOST);
+    MessageBoxW(NULL, L"CreateRemoteThreadEx allowed", L"AntiCheat", MB_OK | MB_TOPMOST);
     return 0;
 }
 
-static NTSTATUS NTAPI HookNtCreateThreadEx(
-    PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes,
-    HANDLE ProcessHandle, PVOID StartRoutine, PVOID Argument, ULONG CreateFlags,
-    SIZE_T ZeroBits, SIZE_T StackSize, SIZE_T MaxStackSize, PVOID AttributeList)
-{
-    // async popup (don’t call MessageBox on the hooking thread)
-    HANDLE th = CreateThread(NULL, 0, MsgThread, NULL, 0, NULL);
-    if (th) CloseHandle(th);
-
-    if (ThreadHandle) *ThreadHandle = NULL;  // behave like failure
-    return STATUS_ACCESS_DENIED;             // cancel the syscall
-    // (Remove the return above and call RealNtCreateThreadEx(...) if you want to allow it)
+static void SpawnPopupAsync() {
+    if (InterlockedCompareExchange(&g_inPopup, 1, 0) == 0) {
+        HANDLE th = CreateThread(NULL, 0, MsgThread, NULL, 0, NULL);
+        if (th) CloseHandle(th);
+        InterlockedExchange(&g_inPopup, 0);
+    }
 }
 
-static void HookOne(LPCSTR name, void** pReal, void* hook) {
-    void* p = GetProcAddress(GetModuleHandleW(L"ntdll.dll"), name);
-    if (!p) return;
-    if (MH_CreateHook(p, hook, pReal) == MH_OK) {
-        MH_EnableHook(p);
+static HANDLE WINAPI HookCreateRemoteThreadEx(
+    HANDLE hProcess,
+    LPSECURITY_ATTRIBUTES sa,
+    SIZE_T stackSize,
+    LPTHREAD_START_ROUTINE start,
+    LPVOID param,
+    DWORD flags,
+    LPPROC_THREAD_ATTRIBUTE_LIST attrList,
+    LPDWORD tid)
+{
+    // forward (do not block)
+    HANDLE h = RealCreateRemoteThreadEx
+        ? RealCreateRemoteThreadEx(hProcess, sa, stackSize, start, param, flags, attrList, tid)
+        : NULL;
+
+    // async popup (guarded to avoid recursion)
+    SpawnPopupAsync();
+    return h;
+}
+
+static void HookExport(HMODULE mod, LPCSTR name, void** pReal, void* hook) {
+    if (!mod) return;
+    if (void* p = (void*)GetProcAddress(mod, name)) {
+        if (MH_CreateHook(p, hook, pReal) == MH_OK) MH_EnableHook(p);
     }
 }
 
 static DWORD WINAPI InitThread(LPVOID) {
     if (MH_Initialize() != MH_OK) return 0;
-    HookOne("NtCreateThreadEx", (void**)&RealNtCreateThreadEx, (void*)HookNtCreateThreadEx);
-    return 0; // keep DLL loaded
+    HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll");
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+
+    HookExport(hKernelBase, "CreateRemoteThreadEx",
+        (void**)&RealCreateRemoteThreadEx, (void*)HookCreateRemoteThreadEx);
+    if (!RealCreateRemoteThreadEx) {
+        HookExport(hKernel32, "CreateRemoteThreadEx",
+            (void**)&RealCreateRemoteThreadEx, (void*)HookCreateRemoteThreadEx);
+    }
+    return 0;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
