@@ -116,7 +116,7 @@ func (r *Receiver) Loop() {
 }
 
 func main() {
-
+	Start("")
 	var pid int
 
 	_, err := fmt.Sscanf(os.Args[1], "%d", &pid)
