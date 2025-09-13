@@ -1,10 +1,10 @@
-# OpenAntiCheat
+# Medusa AntiCheat
 
 <p align="center">
   <img src="Medusa.png" alt="Medusa" width="400"/>
 </p>
 
-OpenAntiCheat is a proof-of-concept anti-cheat system built for **learning Windows kernel development** and experimenting with advanced process monitoring and injection detection techniques.
+Medusa AntiCheat is a proof-of-concept anti-cheat system built for **learning Windows kernel development** and experimenting with advanced process monitoring and injection detection techniques.
 
 ## System Architecture
 
