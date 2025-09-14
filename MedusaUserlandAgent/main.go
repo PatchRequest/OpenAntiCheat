@@ -106,12 +106,6 @@ func (r *Receiver) Loop() {
 		}
 		enrich(&toSendEvent)
 		EventChannel <- toSendEvent
-		jsonData, err := toSendEvent.JSON()
-		if err != nil {
-			fmt.Printf("[ERR] JSON marshal: %v\n", err)
-			continue
-		}
-		fmt.Println(string(jsonData))
 	}
 }
 

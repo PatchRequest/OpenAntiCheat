@@ -26,7 +26,12 @@ static HANDLE WINAPI HookCreateRemoteThreadEx(
     HANDLE h = RealCreateRemoteThreadEx
         ? RealCreateRemoteThreadEx(hProcess, sa, stackSize, start, param, flags, attrList, tid)
         : NULL;
-    SendIPCMessage("CreateRemoteThreadEx called");
+
+    DWORD pid = GetCurrentProcessId();
+    char json[96];
+    _snprintf_s(json, sizeof json, _TRUNCATE,
+        "{\"func\":\"CreateRemoteThreadEx\",\"pid\":%lu}", (unsigned long)pid);
+    SendIPCMessage(json);
     return h;
 }
 
@@ -42,7 +47,7 @@ static DWORD WINAPI InitThread(LPVOID) {
     // init once
     if (InterlockedCompareExchange(&g_inited, 1, 0) != 0) return 0;
 
-    if (MH_Initialize() != MH_OK) { SendIPCMessage("MH_Initialize failed\n"); return 0; }
+    if (MH_Initialize() != MH_OK) { return 0; }
 
     HMODULE kb = GetModuleHandleW(L"KernelBase.dll");
     HMODULE k32 = GetModuleHandleW(L"kernel32.dll");
@@ -51,10 +56,6 @@ static DWORD WINAPI InitThread(LPVOID) {
     if (!RealCreateRemoteThreadEx)
         HookExport(k32, "CreateRemoteThreadEx", (void**)&RealCreateRemoteThreadEx, (void*)HookCreateRemoteThreadEx);
 
-    if (RealCreateRemoteThreadEx)
-        SendIPCMessage("Hooked CreateRemoteThreadEx\n");
-    else
-        SendIPCMessage("Failed to resolve CreateRemoteThreadEx\n");
 
     return 0;
 }
