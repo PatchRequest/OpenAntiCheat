@@ -1,6 +1,3 @@
-// hydra_ws_server.go
-//go:build windows && amd64
-
 package main
 
 import (

@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"syscall"
+	"unicode/utf16"
 )
 
 // stable type tags
@@ -35,7 +35,12 @@ func utf16ToString(buf []uint16) string {
 	for n < len(buf) && buf[n] != 0 {
 		n++
 	}
-	return syscall.UTF16ToString(buf[:n])
+	return utf16BufToString(buf[:n])
+}
+
+// helper: convert a slice of uint16 (UTF-16) to string
+func utf16BufToString(buf []uint16) string {
+	return string(utf16.Decode(buf))
 }
 
 // helper: convert int32 buffer (assuming wide chars stored as int32)
@@ -47,7 +52,7 @@ func int32ToString(buf []int32) string {
 		}
 		u16 = append(u16, uint16(v))
 	}
-	return syscall.UTF16ToString(u16)
+	return utf16BufToString(u16)
 }
 
 // ToJSON marshals ACEvent into a JSON string
