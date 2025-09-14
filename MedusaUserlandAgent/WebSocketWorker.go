@@ -23,7 +23,7 @@ type HydraWS struct {
 	Header    http.Header
 	OnMessage OnMessage
 
-	extCh    <-chan Event
+	extCh    <-chan ACEvent
 	sendCh   chan []byte
 	dialer   *websocket.Dialer
 	pingIntv time.Duration
@@ -41,7 +41,7 @@ type HydraWS struct {
 	wg     sync.WaitGroup
 }
 
-func NewHydraWS(url string, eventCh <-chan Event) *HydraWS {
+func NewHydraWS(url string, eventCh <-chan ACEvent) *HydraWS {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &HydraWS{
 		URL:       url,
@@ -118,7 +118,8 @@ func (h *HydraWS) eventPump() {
 			if !ok {
 				return
 			}
-			b, err := ev.JSON()
+			_ = ev
+			/*b, err := ev.JSON()
 			if err != nil {
 				continue
 			}
@@ -126,7 +127,7 @@ func (h *HydraWS) eventPump() {
 			case h.sendCh <- b:
 			case <-h.ctx.Done():
 				return
-			}
+			}*/
 		case <-h.ctx.Done():
 			return
 		}

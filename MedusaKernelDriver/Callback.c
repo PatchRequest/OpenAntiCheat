@@ -31,11 +31,18 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
         OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &= ~deny;
     }
 
-	OB_OPERATION_HANDLE_Event event = { 0 };
-	TAG_INIT(event, OB_TAG);
-	event.operation = OperationInformation->Operation;
-	event.ProcessId = (int)(ULONG_PTR)pid;
-	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
+    ACEvent event = { 0 };
+    event.src = 0;
+    wcscpy_s(event.EventType, 260, L"HandleOperation");
+    event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
+    event.TargetPID = (int)(ULONG_PTR)pid;
+    event.ThreadID = PsGetCurrentThreadId();
+    wcscpy_s(event.ImageFileName, 260, L"");
+    wcscpy_s(event.CommandLine, 1024, L"");
+    event.IsCreate = 1;
+    event.ImageBase = (PVOID)0xffffffffffff;
+    event.ImageSize = 0xffff;
+
 	ULONG sentBytes = 0;
 	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
 	if (!NT_SUCCESS(status)) {

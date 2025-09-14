@@ -1,9 +1,11 @@
+//go:build windows && amd64
+
 package main
 
 import (
 	"fmt"
-	"sync"
 	"syscall"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -11,7 +13,6 @@ import (
 const defaultPipe = `\\.\pipe\MedusaPipe`
 
 func Start(pipe string) {
-	fmt.Println("Started PipeServer")
 	if pipe == "" {
 		pipe = defaultPipe
 	}
@@ -19,33 +20,34 @@ func Start(pipe string) {
 }
 
 func server(pipe string) {
-	var wg sync.WaitGroup
+	evtSz := uint32(unsafe.Sizeof(ACEvent{}))
+
 	for {
 		h, err := windows.CreateNamedPipe(
 			windows.StringToUTF16Ptr(pipe),
-			windows.PIPE_ACCESS_DUPLEX|windows.FILE_FLAG_OVERLAPPED, // non-blocking accept
+			windows.PIPE_ACCESS_INBOUND|windows.FILE_FLAG_OVERLAPPED, // reader
 			windows.PIPE_TYPE_MESSAGE|windows.PIPE_READMODE_MESSAGE|windows.PIPE_WAIT,
-			16, 64*1024, 64*1024, 0, nil)
+			16,
+			0,        // out buffer (unused)
+			evtSz*16, // in buffer: room for multiple events
+			0, nil)
 		if err != nil || h == windows.InvalidHandle {
 			continue
 		}
 
-		// accept one client per instance, then spin a reader goroutine
 		ov := new(windows.Overlapped)
 		err = windows.ConnectNamedPipe(h, ov)
-		if err == windows.ERROR_PIPE_CONNECTED {
-			// already connected
-		} else if err == windows.ERROR_IO_PENDING {
-			// wait until connected
+		switch err {
+		case windows.ERROR_PIPE_CONNECTED:
+			// ok
+		case windows.ERROR_IO_PENDING:
 			windows.GetOverlappedResult(h, ov, new(uint32), true)
-		} else if err != nil {
+		default:
 			windows.CloseHandle(h)
 			continue
 		}
 
-		wg.Add(1)
 		go func(ph windows.Handle) {
-			defer wg.Done()
 			readLoop(ph)
 			windows.FlushFileBuffers(ph)
 			windows.DisconnectNamedPipe(ph)
@@ -55,21 +57,23 @@ func server(pipe string) {
 }
 
 func readLoop(h windows.Handle) {
-	buf := make([]byte, 64*1024)
+	evtSz := uint32(unsafe.Sizeof(ACEvent{}))
+	buf := make([]byte, evtSz)
+
 	for {
 		var n uint32
 		err := windows.ReadFile(h, buf, &n, nil)
-		if err == windows.ERROR_MORE_DATA {
-			// message larger than buffer: print chunk and continue to drain
-			fmt.Println(string(buf[:n]))
-			continue
-		}
 		if err != nil {
-			// client closed or error
+			// client closed or other error
 			if errno, ok := err.(syscall.Errno); ok {
 				switch errno {
 				case windows.ERROR_BROKEN_PIPE, windows.ERROR_PIPE_NOT_CONNECTED:
 					return
+				case windows.ERROR_MORE_DATA:
+					// message > evtSz: drain remaining bytes
+					// (sender should write exactly sizeof(ACEvent))
+					drain(h)
+					continue
 				}
 			}
 			return
@@ -77,6 +81,32 @@ func readLoop(h windows.Handle) {
 		if n == 0 {
 			return
 		}
-		fmt.Println(string(buf[:n]))
+		if n != evtSz {
+			// unexpected size, skip (or handle framing)
+			continue
+		}
+
+		// bytes → ACEvent (byte-for-byte copy)
+		var ev ACEvent
+		copy((*[1 << 30]byte)(unsafe.Pointer(&ev))[:evtSz:evtSz], buf[:evtSz])
+
+		// optional: forward to your channels etc.
+		if s, err := ev.ToJSON(); err == nil {
+			fmt.Println(s)
+		}
+		// EventChannel <- ev   // if you have one
+	}
+}
+
+func drain(h windows.Handle) {
+	tmp := make([]byte, 16*1024)
+	for {
+		var n uint32
+		err := windows.ReadFile(h, tmp, &n, nil)
+		if err == windows.ERROR_MORE_DATA {
+			continue
+		}
+		// stop on success (n==0 means end) or other errors
+		return
 	}
 }

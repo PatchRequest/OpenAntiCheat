@@ -8,14 +8,18 @@ VOID CreateProcessNotifyRoutineEx(
 	UNREFERENCED_PARAMETER(Process);
 	UNREFERENCED_PARAMETER(ProcessId);
 		
-	CreateProcessNotifyRoutineEvent event = { 0 };
-	TAG_INIT(event, PROC_TAG);
-	event.isCreate = (CreateInfo != NULL) ? 1 : 0;
-	event.ProcessId = (int)(ULONG_PTR)ProcessId;
-	
 
 
-	
+	ACEvent event = { 0 };
+	event.src = 0;
+	wcscpy_s(event.EventType, 260, L"CreateProcess");
+	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
+	event.TargetPID = (int)(ULONG_PTR)ProcessId;
+	event.ThreadID = PsGetCurrentThreadId();
+	event.IsCreate = (CreateInfo != NULL) ? 1 : 0;
+	event.ImageBase = (PVOID)0xffffffffffff;
+	event.ImageSize = 0xffff;
+
 	if (CreateInfo) {
 		// Process is being created
 		if (CreateInfo->ImageFileName) {
@@ -56,21 +60,24 @@ VOID CreateThreadNotifyRoutine(
 		return;
 	}
 	
-	ULONG_PTR pid = (ULONG_PTR)ProcessId;   // target process
-	ULONG_PTR tid = (ULONG_PTR)ThreadId;
-	ULONG_PTR caller = (ULONG_PTR)PsGetCurrentProcessId(); // creator’s PID (context of creator)
 
-	//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Thread created proc %d\n", (unsigned long long)ProcessId);
-	CreateThreadNotifyRoutineEvent ev = { 0 };
-	TAG_INIT(ev, THREAD_TAG);
-	ev.isCreate = Create ? 1 : 0;
-	ev.ProcessId = (int)pid;       // target
-	ev.ThreadId = (int)tid;
-	ev.CallerPID = (int)caller;    // creator
-	ULONG sent = 0; NTSTATUS st = FpSendRaw(&ev, sizeof(ev), NULL, 0, &sent);
-	if (!NT_SUCCESS(st)) {
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-			"FpSendRaw: 0x%08X (sent=%lu)\n", st, sent);
+	ACEvent event = { 0 };
+	event.src = 0;
+	wcscpy_s(event.EventType, 260, L"CreateThread");
+	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
+	event.TargetPID = (int)(ULONG_PTR)ProcessId;
+	event.ThreadID = ThreadId;
+	wcscpy_s(event.ImageFileName, 260, L"");
+	wcscpy_s(event.CommandLine, 1024, L"");
+	event.IsCreate = Create ? 1 : 0;
+	event.ImageBase = (PVOID)0xffffffffffff;
+	event.ImageSize = 0xffff;
+
+
+	ULONG sentBytes = 0;
+	NTSTATUS status = FpSendRaw(&event, sizeof(event), NULL, 0, &sentBytes);
+	if (!NT_SUCCESS(status)) {
+		//DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,"FpSendRaw failed with status 0x%08X\n", status);
 	}
 }
 
@@ -85,9 +92,14 @@ VOID LoadImageNotifyRoutine(
 	UNREFERENCED_PARAMETER(ProcessId);
 	UNREFERENCED_PARAMETER(ImageInfo);
 
-	LoadImageNotifyRoutineEvent event = { 0 };
-	TAG_INIT(event, LOADIMG_TAG);
-	event.ProcessId = (int)(ULONG_PTR)ProcessId;
+	ACEvent event = { 0 };
+	event.src = 0;
+	wcscpy_s(event.EventType, 260, L"LoadImage");
+	event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
+	event.TargetPID = (int)(ULONG_PTR)ProcessId;
+	event.ThreadID = PsGetCurrentThreadId();
+	event.IsCreate = 1;
+	wcscpy_s(event.CommandLine, 1024, L"");
 	if (FullImageName) {
 		wcsncpy_s(event.ImageFileName, 260, FullImageName->Buffer, _TRUNCATE);
 	}

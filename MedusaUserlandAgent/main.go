@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"os"
 	"unsafe"
@@ -36,24 +35,14 @@ const (
 )
 
 var ToProtectPID int32 = 0
-var EventChannel = make(chan Event, 100)
+var EventChannel = make(chan ACEvent, 100)
 var toInjectDLL string = ""
 
 func (r *Receiver) Loop() {
 	hdrSz := uint32(unsafe.Sizeof(filterMessageHeader{}))
-	szProc := uint32(unsafe.Sizeof(CreateProcessNotifyRoutineEvent{}))
-	szThr := uint32(unsafe.Sizeof(CreateThreadNotifyRoutineEvent{}))
-	szFlt := uint32(unsafe.Sizeof(FLT_PREOP_CALLBACK_Event{}))
-	szOb := uint32(unsafe.Sizeof(OB_OPERATION_HANDLE_Event{}))
-	szImg := uint32(unsafe.Sizeof(LoadImageNotifyRoutineEvent{}))
+	eventSz := uint32(unsafe.Sizeof(ACEvent{}))
 
-	maxSz := szProc
-	for _, s := range []uint32{szThr, szFlt, szOb, szImg} {
-		if s > maxSz {
-			maxSz = s
-		}
-	}
-	buf := make([]byte, hdrSz+maxSz)
+	buf := make([]byte, hdrSz+eventSz)
 
 	for {
 		ret, _, _ := pGetMsg.Call(
@@ -70,41 +59,17 @@ func (r *Receiver) Loop() {
 		var hdr filterMessageHeader
 		copy((*[unsafe.Sizeof(hdr)]byte)(unsafe.Pointer(&hdr))[:], buf[:hdrSz])
 
-		payload := buf[hdrSz : hdrSz+maxSz]
-		tag := int32(binary.LittleEndian.Uint32(payload[0:4]))
-		var toSendEvent Event
-		switch tag {
-		case PROC_TAG:
-			var ev CreateProcessNotifyRoutineEvent
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szProc])
-			toSendEvent = FromCreateProcess(ev)
-			if ev.IsCreate != 0 {
-				injectDLLIntoPID(int(ev.ProcessID), toInjectDLL)
-			}
-		case FLT_TAG:
-			var ev FLT_PREOP_CALLBACK_Event
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szFlt])
-			toSendEvent = FromFLT(ev)
+		payload := buf[hdrSz : hdrSz+eventSz]
+		var toSendEvent ACEvent
+		copy((*[unsafe.Sizeof(toSendEvent)]byte)(unsafe.Pointer(&toSendEvent))[:], payload[:eventSz])
+		jsonStr, _ := toSendEvent.ToJSON()
+		_ = jsonStr
+		//fmt.Println(jsonStr)
+		/*if ev.IsCreate != 0 {
+			injectDLLIntoPID(int(ev.ProcessID), toInjectDLL)
+		}*/
 
-		case OB_TAG:
-			var ev OB_OPERATION_HANDLE_Event
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szOb])
-			toSendEvent = FromOB(ev)
-
-		case THREAD_TAG:
-			var ev CreateThreadNotifyRoutineEvent
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szThr])
-			toSendEvent = FromThread(ev)
-
-		case LOADIMG_TAG:
-			var ev LoadImageNotifyRoutineEvent
-			copy((*[unsafe.Sizeof(ev)]byte)(unsafe.Pointer(&ev))[:], payload[:szImg])
-			toSendEvent = FromLoadImage(ev)
-
-		default:
-			fmt.Printf("[WARN] unknown tag=%d msgId=%d\n", tag, hdr.MessageId)
-		}
-		enrich(&toSendEvent)
+		//enrich(&toSendEvent)
 		EventChannel <- toSendEvent
 	}
 }

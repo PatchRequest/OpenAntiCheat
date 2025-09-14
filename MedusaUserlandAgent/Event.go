@@ -2,119 +2,78 @@ package main
 
 import (
 	"encoding/json"
-	"time"
-	"unicode/utf16"
+	"syscall"
 )
 
 // stable type tags
+// EventSource mirrors the C enum
+type EventSource int32
+
 const (
-	EvtCreateProcess = "create_process"
-	EvtFltPreOp      = "flt_preop"
-	EvtObOperation   = "ob_operation"
-	EvtCreateThread  = "create_thread"
-	EvtLoadImage     = "load_image"
+	KM  EventSource = 0
+	UM  EventSource = 1
+	DLL EventSource = 2
 )
 
-type Event struct {
-	Type      string `json:"type"`
-	Timestamp int64  `json:"ts,omitempty"`
-
-	// common
-	ProcessID int32 `json:"pid,omitempty"`
-	ThreadID  int32 `json:"tid,omitempty"`
-	CallerPID int32 `json:"caller_pid,omitempty"`
-	Operation int32 `json:"operation,omitempty"`
-	IsCreate  *bool `json:"is_create,omitempty"`
-
-	// strings normalized from UTF16
-	ImageFile string `json:"image_file,omitempty"`
-	Command   string `json:"command_line,omitempty"`
-	FileName  string `json:"file_name,omitempty"`
-
-	// image specific
-	ImageBase uint64 `json:"image_base,omitempty"`
-	ImageSize uint32 `json:"image_size,omitempty"`
-
-	// computed fields
-	Path         string `json:"path,omitempty"`
-	PathAge      int64  `json:"path_age,omitempty"`  // seconds, days, whatever
-	PathHash     string `json:"path_hash,omitempty"` // sha256/sha1/md5
-	Lifetime     int64  `json:"lifetime,omitempty"`  // process lifetime in seconds
-	ToProctedPID int32  `json:"to_protect_pid,omitempty"`
-
-	Reserved int32 `json:"reserved,omitempty"`
+// ACEvent mirrors the C struct
+type ACEvent struct {
+	Src           EventSource
+	EventType     [260]uint16 // wchar_t[260] → UTF-16 code units
+	CallerPID     int32
+	TargetPID     int32
+	ThreadID      int32
+	ImageFileName [260]int32   // matches int[260] in your struct
+	CommandLine   [1024]uint16 // wchar_t[1024]
+	IsCreate      int32
+	ImageBase     uintptr // PVOID
+	ImageSize     uint32  // ULONG
 }
 
-// helpers
-func utf16BufToString(buf []uint16) string {
-	// trim at first zero
+// helper: convert UTF-16 buffer to Go string
+func utf16ToString(buf []uint16) string {
 	n := 0
 	for n < len(buf) && buf[n] != 0 {
 		n++
 	}
-	return string(utf16.Decode(buf[:n]))
+	return syscall.UTF16ToString(buf[:n])
 }
 
-// builders
-func FromCreateProcess(e CreateProcessNotifyRoutineEvent) Event {
-	ic := e.IsCreate != 0
-	return Event{
-		Type:      EvtCreateProcess,
-		ProcessID: e.ProcessID,
-		IsCreate:  &ic,
-		ImageFile: utf16BufToString(e.ImageFileW[:]),
-		Command:   utf16BufToString(e.CommandLineW[:]),
-		Reserved:  e.Reserved,
-		CallerPID: e.ProcessID,
+// helper: convert int32 buffer (assuming wide chars stored as int32)
+func int32ToString(buf []int32) string {
+	u16 := make([]uint16, 0, len(buf))
+	for _, v := range buf {
+		if v == 0 {
+			break
+		}
+		u16 = append(u16, uint16(v))
 	}
+	return syscall.UTF16ToString(u16)
 }
 
-func FromFLT(e FLT_PREOP_CALLBACK_Event) Event {
-	return Event{
-		Type:      EvtFltPreOp,
-		ProcessID: e.ProcessID,
-		Operation: e.Operation,
-		FileName:  utf16BufToString(e.FileNameW[:]),
-		Reserved:  e.Reserved,
-		CallerPID: e.ProcessID,
+// ToJSON marshals ACEvent into a JSON string
+func (e *ACEvent) ToJSON() (string, error) {
+	out := map[string]interface{}{
+		"Src":           e.Src,
+		"EventType":     utf16ToString(e.EventType[:]),
+		"CallerPID":     e.CallerPID,
+		"TargetPID":     e.TargetPID,
+		"ThreadID":      e.ThreadID,
+		"ImageFileName": int32ToString(e.ImageFileName[:]),
+		"CommandLine":   utf16ToString(e.CommandLine[:]),
+		"IsCreate":      e.IsCreate,
+		"ImageBase":     uintptr(e.ImageBase),
+		"ImageSize":     e.ImageSize,
 	}
-}
 
-func FromOB(e OB_OPERATION_HANDLE_Event) Event {
-	return Event{
-		Type:      EvtObOperation,
-		ProcessID: e.ProcessID,
-		CallerPID: e.CallerPID,
-		Operation: e.Operation,
-		Reserved:  e.Reserved,
+	data, err := json.Marshal(out)
+	if err != nil {
+		return "", err
 	}
+	return string(data), nil
 }
 
-func FromThread(e CreateThreadNotifyRoutineEvent) Event {
-	ic := e.IsCreate != 0
-	return Event{
-		Type:      EvtCreateThread,
-		ProcessID: e.ProcessID,
-		ThreadID:  e.ThreadID,
-		CallerPID: e.CallerPID,
-		IsCreate:  &ic,
-		Reserved:  e.Reserved,
-	}
-}
-
-func FromLoadImage(e LoadImageNotifyRoutineEvent) Event {
-	return Event{
-		Type:      EvtLoadImage,
-		ProcessID: e.ProcessID,
-		ImageFile: utf16BufToString(e.ImageFileW[:]),
-		ImageBase: e.ImageBase,
-		ImageSize: e.ImageSize,
-		Reserved:  e.Reserved,
-		CallerPID: e.ProcessID,
-	}
-}
-
-func enrich(ev *Event) {
+/*
+func enrich(ev interface{}) {
 	if ev.CallerPID == 0 {
 		return
 	}
@@ -136,3 +95,4 @@ func enrich(ev *Event) {
 
 // encode
 func (ev Event) JSON() ([]byte, error) { return json.Marshal(ev) }
+*/

@@ -14,8 +14,57 @@ static volatile LONG g_inited = 0;
 
 
 extern "C" int SendIPCMessage(const char* msg); // from IPC.c (compile separately)
+extern "C" int SendIPCMessageRaw(const void* data, size_t len);
+
+static void EnsureConsole(void) {
+    static BOOL inited = FALSE; if (inited) return; inited = TRUE;
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) AllocConsole();
+    FILE* f;
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+}
 
 
+
+enum EventSource {
+    KM = 0,
+    UM = 1,
+    DLL = 2
+};
+
+
+typedef struct _ACEvent {
+    enum EventSource src;
+    wchar_t EventType[260]; // String Like CreateProcess
+    int CallerPID;
+    int TargetPID;
+    int ThreadID;
+    int ImageFileName[260];
+    wchar_t CommandLine[1024];
+    int IsCreate;
+    PVOID ImageBase;
+    ULONG ImageSize;
+} ACEvent, * PACEvent;
+
+void SendTestEvent(void) {
+    ACEvent ev = { 0 };
+
+    ev.src = DLL;
+    wcsncpy_s(ev.EventType, _countof(ev.EventType), L"TestEvent", _TRUNCATE);
+    ev.CallerPID = (int)GetCurrentProcessId();
+    ev.TargetPID = ev.CallerPID;
+    ev.ThreadID = GetCurrentThreadId();
+    ev.IsCreate = 1;
+    ev.ImageBase = (PVOID)0xDEADBEEF;   // dummy
+    ev.ImageSize = 1234;                // dummy
+
+    // optional: set some command line text
+    wcsncpy_s(ev.CommandLine, _countof(ev.CommandLine), L"echo hello world", _TRUNCATE);
+
+    SendIPCMessageRaw(&ev, sizeof(ev));
+}
 
 
 static HANDLE WINAPI HookCreateRemoteThreadEx(
@@ -27,11 +76,21 @@ static HANDLE WINAPI HookCreateRemoteThreadEx(
         ? RealCreateRemoteThreadEx(hProcess, sa, stackSize, start, param, flags, attrList, tid)
         : NULL;
 
-    DWORD pid = GetCurrentProcessId();
-    char json[96];
-    _snprintf_s(json, sizeof json, _TRUNCATE,
-        "{\"func\":\"CreateRemoteThreadEx\",\"pid\":%lu}", (unsigned long)pid);
-    SendIPCMessage(json);
+    ACEvent ev = { 0 };
+    ev.src = DLL;
+    wcsncpy_s(ev.EventType, _countof(ev.EventType), L"CreateRemoteThreadEx", _TRUNCATE);
+    ev.CallerPID = (int)GetCurrentProcessId();
+    ev.TargetPID = (int)GetProcessId(hProcess);
+    ev.ThreadID = (tid && *tid) ? (int)(*tid) : (h ? (int)GetThreadId(h) : 0);
+    // Optional: capture our own cmdline (caller context)
+    // wcsncpy_s(ev.CommandLine, _countof(ev.CommandLine), GetCommandLineW(), _TRUNCATE);
+    ev.IsCreate = (h != NULL);
+    ev.ImageBase = (PVOID)start;   // remote start routine
+    ev.ImageSize = 0;
+
+    // ImageFileName left zeroed (int[260] per your typedef)
+
+    SendIPCMessageRaw(&ev, sizeof(ev));
     return h;
 }
 
@@ -48,6 +107,9 @@ static DWORD WINAPI InitThread(LPVOID) {
     if (InterlockedCompareExchange(&g_inited, 1, 0) != 0) return 0;
 
     if (MH_Initialize() != MH_OK) { return 0; }
+    EnsureConsole();
+    printf("[medusa] DLL loaded in PID %lu\n", GetCurrentProcessId());
+    SendTestEvent();
 
     HMODULE kb = GetModuleHandleW(L"KernelBase.dll");
     HMODULE k32 = GetModuleHandleW(L"kernel32.dll");
