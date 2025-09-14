@@ -12,11 +12,17 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/gorilla/websocket"
 )
 
 type OnMessage func([]byte)
+
+type wsFrame struct {
+	mt   int
+	data []byte
+}
 
 type HydraWS struct {
 	URL       string
@@ -24,7 +30,7 @@ type HydraWS struct {
 	OnMessage OnMessage
 
 	extCh    <-chan ACEvent
-	sendCh   chan []byte
+	sendCh   chan wsFrame
 	dialer   *websocket.Dialer
 	pingIntv time.Duration
 	backoff  struct {
@@ -48,11 +54,11 @@ func NewHydraWS(url string, eventCh <-chan ACEvent) *HydraWS {
 		Header:    make(http.Header),
 		OnMessage: func([]byte) {},
 		extCh:     eventCh,
-		sendCh:    make(chan []byte, 1024),
+		sendCh:    make(chan wsFrame, 1024),
 		dialer: &websocket.Dialer{
 			HandshakeTimeout:  8 * time.Second,
 			EnableCompression: true,
-			Proxy:             nil, // bypass system/corp proxy which often breaks WS on LAN
+			Proxy:             nil,
 			NetDialContext: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 30 * time.Second,
@@ -73,12 +79,9 @@ func NewHydraWS(url string, eventCh <-chan ACEvent) *HydraWS {
 	return h
 }
 
-func (h *HydraWS) WithHeader(hdr http.Header) *HydraWS { h.Header = hdr; return h }
-func (h *HydraWS) WithPingInterval(d time.Duration) *HydraWS {
-	h.pingIntv = d
-	return h
-}
-func (h *HydraWS) WithOnMessage(f OnMessage) *HydraWS { h.OnMessage = f; return h }
+func (h *HydraWS) WithHeader(hdr http.Header) *HydraWS       { h.Header = hdr; return h }
+func (h *HydraWS) WithPingInterval(d time.Duration) *HydraWS { h.pingIntv = d; return h }
+func (h *HydraWS) WithOnMessage(f OnMessage) *HydraWS        { h.OnMessage = f; return h }
 
 func (h *HydraWS) Close() error {
 	h.cancel()
@@ -94,14 +97,14 @@ func (h *HydraWS) Close() error {
 	return nil
 }
 
-// SendJSON convenience for ad-hoc payloads
+// SendJSON remains (text frames)
 func (h *HydraWS) SendJSON(v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 	select {
-	case h.sendCh <- b:
+	case h.sendCh <- wsFrame{mt: websocket.TextMessage, data: b}:
 		return nil
 	case <-h.ctx.Done():
 		return errors.New("closed")
@@ -109,6 +112,14 @@ func (h *HydraWS) SendJSON(v any) error {
 }
 
 // ---- internals ----
+
+func evToBytes(ev *ACEvent) []byte {
+	sz := int(unsafe.Sizeof(*ev))
+	out := make([]byte, sz)
+	src := (*[1 << 30]byte)(unsafe.Pointer(ev))[:sz:sz]
+	copy(out, src)
+	return out
+}
 
 func (h *HydraWS) eventPump() {
 	defer h.wg.Done()
@@ -118,16 +129,12 @@ func (h *HydraWS) eventPump() {
 			if !ok {
 				return
 			}
-			_ = ev
-			/*b, err := ev.JSON()
-			if err != nil {
-				continue
-			}
+			payload := evToBytes(&ev) // raw struct bytes
 			select {
-			case h.sendCh <- b:
+			case h.sendCh <- wsFrame{mt: websocket.BinaryMessage, data: payload}:
 			case <-h.ctx.Done():
 				return
-			}*/
+			}
 		case <-h.ctx.Done():
 			return
 		}
@@ -176,7 +183,7 @@ func (h *HydraWS) run() {
 		if h.ctx.Err() != nil {
 			return
 		}
-		_ = err // ignore, reconnect loop continues
+		_ = err
 	}
 }
 
@@ -184,8 +191,6 @@ func (h *HydraWS) connect() error {
 	if h.ctx.Err() != nil {
 		return context.Canceled
 	}
-
-	// per-attempt timeout (independent of backoff)
 	ctx, cancel := context.WithTimeout(h.ctx, 8*time.Second)
 	defer cancel()
 
@@ -201,8 +206,7 @@ func (h *HydraWS) connect() error {
 		}
 		return err
 	}
-
-	conn.SetReadLimit(16 << 20) // no SetPongHandler
+	conn.SetReadLimit(16 << 20)
 	h.connMu.Lock()
 	h.conn = conn
 	h.connMu.Unlock()
@@ -238,12 +242,12 @@ func (h *HydraWS) writeLoop() error {
 	}
 	for {
 		select {
-		case b := <-h.sendCh:
-			if b == nil {
+		case fr := <-h.sendCh:
+			if fr.data == nil {
 				return nil
 			}
 			_ = conn.SetWriteDeadline(time.Now().Add(15 * time.Second))
-			if err := conn.WriteMessage(websocket.TextMessage, b); err != nil {
+			if err := conn.WriteMessage(fr.mt, fr.data); err != nil {
 				return err
 			}
 		case <-h.ctx.Done():
@@ -255,7 +259,6 @@ func (h *HydraWS) writeLoop() error {
 func (h *HydraWS) pingLoop() error {
 	t := time.NewTicker(h.pingIntv)
 	defer t.Stop()
-
 	h.connMu.RLock()
 	conn := h.conn
 	h.connMu.RUnlock()
@@ -277,10 +280,10 @@ func (h *HydraWS) pingLoop() error {
 
 func (h *HydraWS) nextBackoff(n int) time.Duration {
 	base := float64(h.backoff.initial)
-	max := float64(h.backoff.max)
 	if base == 0 {
 		base = float64(500 * time.Millisecond)
 	}
+	max := float64(h.backoff.max)
 	if max == 0 {
 		max = float64(30 * time.Second)
 	}

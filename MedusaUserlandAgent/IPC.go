@@ -3,7 +3,6 @@
 package main
 
 import (
-	"fmt"
 	"syscall"
 	"unsafe"
 
@@ -90,11 +89,7 @@ func readLoop(h windows.Handle) {
 		var ev ACEvent
 		copy((*[1 << 30]byte)(unsafe.Pointer(&ev))[:evtSz:evtSz], buf[:evtSz])
 
-		// optional: forward to your channels etc.
-		if s, err := ev.ToJSON(); err == nil {
-			fmt.Println(s)
-		}
-		// EventChannel <- ev   // if you have one
+		EventChannel <- ev
 	}
 }
 
