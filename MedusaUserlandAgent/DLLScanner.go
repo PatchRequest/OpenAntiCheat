@@ -113,3 +113,25 @@ func GetProcessModules(pid uint32) ([]ModuleInfo, error) {
 	}
 	return out, nil
 }
+
+func executeDLLScan(pid int32) {
+	mods, err := GetProcessModules(uint32(pid))
+	if err != nil { /* handle */
+		fmt.Println(err)
+	}
+	for _, m := range mods {
+		var dllEvent ACEvent
+		//fmt.Printf("%-32s base=0x%X size=0x%X path=%s\n", m.Name, m.Base, m.Size, m.Path)
+		dllEvent.Src = 1
+		dllEvent.EventType = StringZ260U16("DLLScan")
+		dllEvent.CallerPID = 0
+		dllEvent.TargetPID = 0
+		dllEvent.ThreadID = 0
+		dllEvent.ImageFileName = StringZ260I32(m.Path)
+		dllEvent.CommandLine = StringZ1024U16("")
+		dllEvent.IsCreate = 0
+		dllEvent.ImageBase = m.Base
+		dllEvent.ImageSize = m.Size
+		EventChannel <- dllEvent
+	}
+}

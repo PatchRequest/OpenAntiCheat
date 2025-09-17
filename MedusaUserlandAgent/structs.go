@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"unicode/utf16"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -88,3 +89,40 @@ func hresultText(hr uintptr) string {
 }
 
 // ------------------- utility functions -------------------
+
+type RuneLike interface{ ~int32 | ~uint16 }
+
+// returns a zero-terminated buffer of length n
+func StringZInto[T RuneLike](dst []T, s string) []T {
+	for i := range dst {
+		dst[i] = 0
+	}
+	if len(dst) <= 1 {
+		return dst
+	}
+	switch any(*new(T)).(type) {
+	case int32:
+		i := 0
+		for _, r := range s {
+			if i >= len(dst)-1 {
+				break
+			}
+			dst[i] = T(r)
+			i++
+		}
+	case uint16:
+		cu := utf16.Encode([]rune(s))
+		if len(cu) > len(dst)-1 {
+			cu = cu[:len(dst)-1]
+		}
+		for i := range cu {
+			dst[i] = T(cu[i])
+		}
+	}
+	return dst
+}
+
+// convenience wrappers for your common fixed sizes
+func StringZ260I32(s string) (out [260]int32)    { StringZInto(out[:], s); return }
+func StringZ260U16(s string) (out [260]uint16)   { StringZInto(out[:], s); return }
+func StringZ1024U16(s string) (out [1024]uint16) { StringZInto(out[:], s); return }

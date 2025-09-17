@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -99,12 +100,7 @@ func main() {
 			fmt.Println("recv:", string(b))
 		})
 	defer client.Close()
-	mods, err := GetProcessModules(uint32(pid))
-	if err != nil { /* handle */
-		fmt.Println(err)
-	}
-	for _, m := range mods {
-		fmt.Printf("%-32s base=0x%X size=0x%X path=%s\n", m.Name, m.Base, m.Size, m.Path)
-	}
+	time.Sleep(10 * time.Second)
+	executeDLLScan(ToProtectPID)
 	r.Loop()
 }

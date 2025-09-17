@@ -52,7 +52,7 @@ func NewHydraWS(url string, eventCh <-chan ACEvent) *HydraWS {
 	h := &HydraWS{
 		URL:       url,
 		Header:    make(http.Header),
-		OnMessage: func([]byte) {},
+		OnMessage: onMessageHandle,
 		extCh:     eventCh,
 		sendCh:    make(chan wsFrame, 1024),
 		dialer: &websocket.Dialer{
@@ -77,6 +77,10 @@ func NewHydraWS(url string, eventCh <-chan ACEvent) *HydraWS {
 	h.wg.Add(1)
 	go h.run()
 	return h
+}
+
+func onMessageHandle(msg []byte) {
+	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAA")
 }
 
 func (h *HydraWS) WithHeader(hdr http.Header) *HydraWS       { h.Header = hdr; return h }
