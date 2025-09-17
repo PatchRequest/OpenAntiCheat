@@ -2,6 +2,11 @@
 #define PROCESS_VM_READ       0x0010
 #define PROCESS_VM_WRITE      0x0020
 #define PROCESS_VM_OPERATION  0x0008
+#ifndef PROCESS_QUERY_LIMITED_INFORMATION
+#define PROCESS_QUERY_LIMITED_INFORMATION 0x1000 // Vista+
+#endif
+#define MINIMAL_ALLOW (PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE)
+
 PVOID callbackRegistrationHandle = NULL;
 
 
@@ -23,18 +28,21 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
     if ((LONG)pid != ToProtectPID) {
         return OB_PREOP_SUCCESS;
     }
-    /*const ACCESS_MASK deny = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | GENERIC_READ | GENERIC_WRITE;
-    if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
-        OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~deny;
+    
+    HANDLE callerPID = PsGetCurrentProcessId();
+    if (callerPID != AgentPID) {
+        if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
+            OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= MINIMAL_ALLOW;
+        }
+        else { // OB_OPERATION_HANDLE_DUPLICATE
+            OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &= MINIMAL_ALLOW;
+        }
     }
-    else { // OB_OPERATION_HANDLE_DUPLICATE
-        OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &= ~deny;
-    }*/
 
     ACEvent event = { 0 };
     event.src = 0;
     wcscpy_s(event.EventType, 260, L"HandleOperation");
-    event.CallerPID = (int)(ULONG_PTR)PsGetCurrentProcessId();
+    event.CallerPID = (int)(ULONG_PTR)callerPID;
     event.TargetPID = (int)(ULONG_PTR)pid;
     event.ThreadID = PsGetCurrentThreadId();
     wcscpy_s(event.ImageFileName, 260, L"");

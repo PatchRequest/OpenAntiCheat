@@ -2,6 +2,8 @@
 #include <fltKernel.h>
 
 extern volatile LONG ToProtectPID;
+extern volatile LONG AgentPID;
+
 extern PFLT_FILTER flt_handle; 
 
 NTSTATUS BindToExistingFilterAndCreatePort(_In_ PCWSTR FilterName);
