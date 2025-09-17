@@ -51,32 +51,44 @@ VOID MinifltPortFinalize(void)
 
 
 volatile LONG ToProtectPID = 99133799;
+volatile LONG AgentPID = 99133799;
+
+typedef struct _CONNECT_CTX_V1 {
+	ULONG Version;      // = 1
+	LONG  ToProtectPID; // target/game
+	LONG  AgentPID;     // your userland agent
+} CONNECT_CTX_V1;
+
 //
 // This function will be call when
 // user mode application calls FilterConnectCommunicationPort
 //
+_Use_decl_annotations_
 NTSTATUS MinifltPortNotifyRoutine(
-	_In_  PFLT_PORT connected_client_port,
-	_In_  PVOID server_cookie,
-	_In_  PVOID connection_context,
-	_In_  ULONG connection_context_size,
-	_Out_ PVOID* connection_port_cookie
+	PFLT_PORT connected_client_port,
+	PVOID     server_cookie,
+	PVOID     connection_context,
+	ULONG     connection_context_size,
+	PVOID* connection_port_cookie
 ) {
 	UNREFERENCED_PARAMETER(server_cookie);
 	UNREFERENCED_PARAMETER(connection_port_cookie);
 
 	client_port = connected_client_port;
 
-	if (connection_context && connection_context_size >= sizeof(LONG)) {
-		LONG v = *(const LONG*)connection_context;
-		InterlockedExchange(&ToProtectPID, v);
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-			"ToProtectPID set to %ld\n", ToProtectPID);
+	if (connection_context) {
+		// V1 struct: Version + 2 pids
+		const CONNECT_CTX_V1* ctx = (const CONNECT_CTX_V1*)connection_context;
+		if (ctx->Version == 1) {
+			InterlockedExchange(&ToProtectPID, ctx->ToProtectPID);
+			InterlockedExchange(&AgentPID, ctx->AgentPID);
+			DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
+				"Set pids: target=%ld agent=%ld\n", ToProtectPID, AgentPID);
+		}
 	}
 
 	DbgPrint("[filterport] %s pid=%u connected\n", __FUNCTION__,
 		PtrToUint(PsGetCurrentProcessId()));
-
 	return STATUS_SUCCESS;
 }
 

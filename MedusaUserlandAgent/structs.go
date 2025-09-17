@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -20,6 +21,12 @@ type Receiver struct {
 
 func NewReceiver(portName string) *Receiver { return &Receiver{name: portName} }
 
+type ConnectCtxV1 struct {
+	Version      uint32 // =1
+	ToProtectPID int32  // target
+	AgentPID     int32  // this agent
+}
+
 func (r *Receiver) Connect() error {
 	if err := modFltlib.Load(); err != nil {
 		return err
@@ -29,13 +36,18 @@ func (r *Receiver) Connect() error {
 		return err
 	}
 
+	ctx := ConnectCtxV1{
+		Version:      1,
+		ToProtectPID: int32(ToProtectPID),
+		AgentPID:     int32(os.Getpid()),
+	}
+
 	var h windows.Handle
-	pid := ToProtectPID // int32 global you already have
 	ret, _, _ := pConnect.Call(
 		uintptr(unsafe.Pointer(u16)),  // LPCWSTR PortName
 		0,                             // DWORD Options
-		uintptr(unsafe.Pointer(&pid)), // PVOID  Context
-		uintptr(unsafe.Sizeof(pid)),   // WORD   SizeOfContext (bytes)
+		uintptr(unsafe.Pointer(&ctx)), // PVOID  Context
+		uintptr(unsafe.Sizeof(ctx)),   // WORD   SizeOfContext
 		0,                             // PSECURITY_ATTRIBUTES
 		uintptr(unsafe.Pointer(&h)),   // HANDLE* Port
 	)
@@ -45,7 +57,8 @@ func (r *Receiver) Connect() error {
 	}
 
 	r.hPort = h
-	fmt.Printf("[OK] Connected %s, sent ToProtectPID=%d\n", r.name, pid)
+	fmt.Printf("[OK] Connected %s sent target=%d agent=%d\n",
+		r.name, ctx.ToProtectPID, ctx.AgentPID)
 	return nil
 }
 

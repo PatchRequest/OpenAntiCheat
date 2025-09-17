@@ -99,6 +99,12 @@ func main() {
 			fmt.Println("recv:", string(b))
 		})
 	defer client.Close()
-	fmt.Println(client)
+	mods, err := GetProcessModules(uint32(pid))
+	if err != nil { /* handle */
+		fmt.Println(err)
+	}
+	for _, m := range mods {
+		fmt.Printf("%-32s base=0x%X size=0x%X path=%s\n", m.Name, m.Base, m.Size, m.Path)
+	}
 	r.Loop()
 }

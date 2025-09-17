@@ -23,13 +23,13 @@ OB_PREOP_CALLBACK_STATUS CreateCallback(PVOID RegistrationContext, POB_PRE_OPERA
     if ((LONG)pid != ToProtectPID) {
         return OB_PREOP_SUCCESS;
     }
-    const ACCESS_MASK deny = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | GENERIC_READ | GENERIC_WRITE;
+    /*const ACCESS_MASK deny = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | GENERIC_READ | GENERIC_WRITE;
     if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
         OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~deny;
     }
     else { // OB_OPERATION_HANDLE_DUPLICATE
         OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess &= ~deny;
-    }
+    }*/
 
     ACEvent event = { 0 };
     event.src = 0;
