@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -97,10 +96,13 @@ func main() {
 	defer r.Close()
 	client := NewHydraWS(os.Args[2], EventChannel).
 		WithOnMessage(func(b []byte) {
-			fmt.Println("recv:", string(b))
+			if string(b) == "scanDLL" {
+				executeDLLScan(ToProtectPID)
+				fmt.Println(string(b))
+			}
+
 		})
 	defer client.Close()
-	time.Sleep(10 * time.Second)
-	executeDLLScan(ToProtectPID)
+
 	r.Loop()
 }
