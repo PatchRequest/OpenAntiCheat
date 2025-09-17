@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -24,6 +25,11 @@ func main() {
 			}
 		}
 	}()
+	for {
+		s.SendText <- "scanDLL"
+		time.Sleep(5 * time.Second)
+		fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+	}
 
 	// block
 	sig := make(chan os.Signal, 1)
